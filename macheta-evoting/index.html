@@ -1,0 +1,1833 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vot electronic verificabil</title>
+<meta name="description" content="Machetă demonstrativă: ElGamal exponențial, dovezi zero-knowledge, bulletin board public și numărare homomorfică.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232b59e8'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #f7f9fc;
+    --ink: #0e1726;
+    --ink-2: #334155;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --line-2: #cbd5e1;
+    --accent: #2b59e8;
+    --accent-2: #2047c4;
+    --accent-soft: #edf2ff;
+    --accent-line: #d3defd;
+    --ok: #0f8a5f;
+    --ok-soft: #e6f6ee;
+    --ok-line: #bfe6d3;
+    --bad: #c4323f;
+    --bad-soft: #fdeef0;
+    --bad-line: #f3c3c8;
+    --warn: #a35f00;
+    --warn-soft: #fff4e0;
+    --warn-line: #f5d9a8;
+    --c0: #2b59e8;
+    --c1: #0f9b74;
+    --c2: #dd6b20;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 6px 18px rgba(15, 23, 42, .05);
+    --mono: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas, "SF Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font: 15px/1.55 var(--sans); color: var(--ink); background: var(--bg); }
+  button { font: inherit; }
+  code, .mono { font-family: var(--mono); }
+  [hidden] { display: none !important; }
+
+  /* ── Antet și navigare ── */
+  .topbar { position: sticky; top: 0; z-index: 20; background: rgba(255, 255, 255, .94); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
+  .topbar-inner { max-width: 1200px; margin: 0 auto; padding: 12px 24px 0; }
+  .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { width: 38px; height: 38px; flex: none; border-radius: 11px; background: var(--accent); color: #fff; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(43, 89, 232, .3); }
+  .brand h1 { font-size: 17px; margin: 0; letter-spacing: -.01em; line-height: 1.25; }
+  .brand p { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .status { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+  .chip b { font-variant-numeric: tabular-nums; }
+  .chip.on { background: var(--ok-soft); border-color: var(--ok-line); color: var(--ok); }
+  .chip.voter { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent-2); }
+  .steps { display: flex; gap: 2px; overflow-x: auto; margin-top: 8px; scrollbar-width: none; }
+  .steps::-webkit-scrollbar { display: none; }
+  .step-tab { display: flex; align-items: center; gap: 8px; padding: 8px 12px 11px; border: 0; background: none; font-size: 14px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+  .step-tab:hover { color: var(--ink); }
+  .step-tab .num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-2); border: 1px solid var(--line-2); color: var(--ink-2); }
+  .step-tab.done .num { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+  .step-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .step-tab.active .num { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step-tab.attack { margin-left: auto; color: var(--bad); }
+  .step-tab.attack .num { background: var(--bad-soft); border-color: var(--bad-line); color: var(--bad); }
+  .step-tab.attack.active { border-bottom-color: var(--bad); color: var(--bad); }
+  .step-tab.attack.active .num { background: var(--bad); border-color: var(--bad); color: #fff; }
+
+  /* ── Conținut ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 26px 24px 110px; }
+  .step-head { margin-bottom: 20px; }
+  .kicker { font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
+  .attack-section .kicker { color: var(--bad); }
+  h2 { font-size: 27px; margin: 2px 0 12px; letter-spacing: -.02em; line-height: 1.2; }
+  .explain { display: flex; gap: 12px; align-items: flex-start; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 12px; padding: 12px 16px; color: #1d367f; max-width: 920px; font-size: 15.5px; }
+  .explain svg { flex: none; margin-top: 2px; }
+  .attack-section .explain { background: var(--bad-soft); border-color: var(--bad-line); color: #7a1d26; }
+  .grid { display: grid; gap: 18px; }
+  .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid.wide-left { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+  .stack { display: grid; gap: 18px; margin-top: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; min-width: 0; }
+  .card h3 { margin: 0 0 4px; font-size: 16.5px; letter-spacing: -.01em; }
+  .card .sub { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  .step-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .spacer { flex: 1; }
+  .empty { padding: 22px; text-align: center; color: var(--muted); background: var(--surface-2); border: 1px dashed var(--line-2); border-radius: 12px; font-size: 14px; }
+
+  /* ── Butoane ── */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 14.5px; padding: 10px 16px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; transition: background .15s, box-shadow .15s, border-color .15s; white-space: nowrap; }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn.primary { background: var(--accent); color: #fff; box-shadow: 0 1px 2px rgba(43, 89, 232, .35); }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-2); }
+  .btn.secondary { background: #fff; color: var(--ink); border-color: var(--line-2); }
+  .btn.secondary:hover:not(:disabled) { background: var(--surface-2); border-color: #94a3b8; }
+  .btn.danger { background: var(--bad); color: #fff; box-shadow: 0 1px 2px rgba(196, 50, 63, .35); }
+  .btn.danger:hover:not(:disabled) { background: #a92633; }
+  .btn.ghost { background: transparent; color: var(--accent); padding: 8px 10px; }
+  .btn.ghost:hover:not(:disabled) { background: var(--accent-soft); }
+  .btn.small { padding: 6px 11px; font-size: 13px; border-radius: 8px; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.is-busy { opacity: .9; cursor: progress; }
+  .btn.is-busy::before, .spinner { content: ""; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Elemente mici ── */
+  .hx { font-family: var(--mono); font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--ink-2); white-space: nowrap; }
+  .hx.chain { border-left: 4px solid hsl(var(--h) 72% 48%); }
+  .hx.big { font-size: 13.5px; padding: 3px 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650; padding: 2px 9px; border-radius: 999px; white-space: nowrap; line-height: 1.6; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.info { background: var(--accent-soft); color: var(--accent-2); }
+  .badge.muted { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+  .notice { border-radius: 12px; padding: 12px 14px; border: 1px solid; display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; }
+  .notice > svg { flex: none; margin-top: 2px; }
+  .notice.ok { background: var(--ok-soft); border-color: var(--ok-line); color: #0b5a3f; }
+  .notice.bad { background: var(--bad-soft); border-color: var(--bad-line); color: #8a1f2a; }
+  .notice.warn { background: var(--warn-soft); border-color: var(--warn-line); color: #7a4700; }
+  .notice.info { background: var(--accent-soft); border-color: var(--accent-line); color: #1d367f; }
+  .notice b { font-weight: 700; }
+  .kv { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .kv > span:first-child { color: var(--muted); }
+  .formula { font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
+  .progress { height: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .progress > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .2s; }
+  .progress.bad > i { background: var(--bad); }
+  .progress.ok > i { background: var(--ok); }
+
+  /* ── Pasul 1 ── */
+  .cand-list { display: grid; gap: 10px; }
+  .cand-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+  .cand-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--cc); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+  .cand-row input { flex: 1; min-width: 0; border: 1px solid transparent; background: transparent; font: inherit; font-weight: 600; padding: 6px 8px; border-radius: 8px; color: var(--ink); }
+  .cand-row input:not(:disabled):hover { border-color: var(--line-2); background: #fff; }
+  .cand-row input:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cand-row input:disabled { color: var(--ink); -webkit-text-fill-color: var(--ink); opacity: 1; }
+  .cand-party { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .params { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line-2); }
+  .params div { display: grid; gap: 2px; min-width: 0; }
+  .params span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .params b { font-size: 14px; }
+  .params code { justify-self: start; }
+  .trustee-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+  .trustee { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); min-width: 0; }
+  .trustee-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .t-avatar { width: 30px; height: 30px; border-radius: 9px; background: #1e293b; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+  .trustee-head b { display: block; font-size: 14px; }
+  .trustee-head small { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; }
+  .trustee .kv { flex-wrap: wrap; }
+  .combined { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-soft), #f5f0ff); border: 1px solid var(--accent-line); display: grid; gap: 6px; }
+  .combined .formula { font-size: 14px; color: var(--accent-2); font-weight: 600; }
+  .secret { font-size: 12.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+
+  /* ── Pasul 2 ── */
+  .methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .method { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 14px; border: 2px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s; color: var(--ink); }
+  .method:hover:not(:disabled) { border-color: var(--accent); }
+  .method.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .method .m-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+  .method b { display: block; font-size: 14.5px; }
+  .method small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 2px; }
+  .method:disabled { opacity: .55; cursor: not-allowed; }
+  .scan-zone { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .idcard { position: relative; aspect-ratio: 1.586; border-radius: 14px; background: linear-gradient(135deg, #eef3ff 0%, #e2eaff 55%, #f1e9ff 100%); border: 1px solid #c9d6f5; overflow: hidden; padding: 10px 12px; font-size: 11px; color: #334155; }
+  .idcard-top { display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; letter-spacing: .08em; color: #475569; }
+  .idcard-top .spec { color: var(--bad); }
+  .idcard-body { display: flex; gap: 10px; margin-top: 8px; }
+  .idcard .photo { width: 27%; aspect-ratio: .78; border-radius: 7px; background: linear-gradient(180deg, #cbd5e8, #b4c1dc); flex: none; position: relative; overflow: hidden; }
+  .idcard .photo::after { content: ""; position: absolute; left: 22%; right: 22%; top: 18%; aspect-ratio: 1; border-radius: 50%; background: #9fb0d1; box-shadow: 0 34px 0 10px #9fb0d1; }
+  .idcard-fields { display: grid; gap: 4px; min-width: 0; flex: 1; align-content: start; }
+  .idcard-fields small { display: block; font-size: 8.5px; text-transform: uppercase; color: #64748b; letter-spacing: .06em; }
+  .idcard-fields b { display: block; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .idcard .ph { height: 9px; border-radius: 4px; background: rgba(15, 23, 42, .1); margin: 6px 0; }
+  .idcard .ph.short { width: 60%; }
+  .idcard .gold { position: absolute; right: 14px; top: 34%; width: 34px; height: 26px; border-radius: 5px; background: linear-gradient(135deg, #f3d27a, #c9a142); border: 1px solid #b58e33; }
+  .idcard .mrz { position: absolute; left: 12px; right: 12px; bottom: 8px; font-family: var(--mono); font-size: 9.5px; color: rgba(15, 23, 42, .5); letter-spacing: .06em; white-space: nowrap; overflow: hidden; }
+  .scanline { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--accent), transparent); box-shadow: 0 0 14px 2px rgba(43, 89, 232, .6); animation: scan 1s ease-in-out infinite alternate; }
+  @keyframes scan { from { top: 3%; } to { top: 95%; } }
+  .waves { position: absolute; right: 31px; top: calc(34% + 13px); }
+  .waves i { position: absolute; left: 0; top: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid var(--accent); border-radius: 50%; animation: wave 1.3s ease-out infinite; }
+  .waves i:nth-child(2) { animation-delay: .43s; }
+  .waves i:nth-child(3) { animation-delay: .86s; }
+  @keyframes wave { from { transform: scale(1); opacity: .9; } to { transform: scale(9); opacity: 0; } }
+  .scan-status { font-size: 13.5px; display: grid; gap: 8px; }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 16px; }
+  .field { display: grid; gap: 4px; min-width: 0; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .field input { font: inherit; padding: 9px 11px; border: 1px solid var(--line-2); border-radius: 9px; background: #fff; color: var(--ink); min-width: 0; }
+  .field input[readonly] { background: var(--surface-2); color: var(--ink-2); }
+  .field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .field input.cnp { font-family: var(--mono); font-size: 17px; letter-spacing: .06em; }
+  .cnp-check { font-size: 13px; min-height: 20px; }
+  .cnp-check.ok { color: var(--ok); }
+  .cnp-check.bad { color: var(--bad); }
+  .flow { display: grid; gap: 0; }
+  .flow-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); display: grid; gap: 4px; }
+  .flow-box.saved { background: var(--ok-soft); border-color: var(--ok-line); }
+  .flow-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .flow-val { font-family: var(--mono); font-size: 15px; word-break: break-all; color: var(--ink); }
+  .flow-val.cnp-big { font-size: 19px; letter-spacing: .08em; }
+  .flow-arrow { display: flex; align-items: center; gap: 10px; padding: 8px 0 8px 18px; color: var(--accent-2); font-size: 13px; font-weight: 600; }
+  .flow-arrow::before { content: "↓"; font-size: 20px; line-height: 1; }
+  .not-saved { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .not-saved span { font-size: 12.5px; text-decoration: line-through; color: var(--muted); background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+  .trust-box { margin-top: 12px; display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); }
+  .trust-box.optic { background: var(--warn-soft); border-color: var(--warn-line); }
+  .trust-box.criptografic { background: var(--ok-soft); border-color: var(--ok-line); }
+  .trust-box p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+
+  /* ── Tabele ── */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tbl th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 10px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .tbl th.math { text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .tbl td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl tr.clickable { cursor: pointer; }
+  .tbl tr.clickable:hover td { background: var(--surface-2); }
+  .tbl tr.current td { background: var(--accent-soft); }
+  .tbl tr.match td { background: #fff7d1; }
+  .tbl tr.flagged td { background: var(--bad-soft); }
+  .tbl tr.detail td { background: var(--surface-2); padding: 14px; }
+  .tbl .idx { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .tbl .code { font-family: var(--mono); font-weight: 600; font-size: 13px; letter-spacing: .03em; }
+  .cand-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .cand-tag::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--cc); flex: none; }
+  .link-arrow { color: var(--muted); padding: 0 4px; }
+
+  /* ── Pasul 3 ── */
+  .voter-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; background: #fff; border: 1px solid var(--line); margin-bottom: 18px; box-shadow: var(--shadow); }
+  .voter-bar .v-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1e293b; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+  .choices { display: grid; gap: 10px; }
+  .choice { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 13px 16px; border: 2px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; color: var(--ink); transition: border-color .15s, background .15s; }
+  .choice:hover:not(:disabled) { border-color: var(--cc); }
+  .choice:disabled { cursor: not-allowed; opacity: .6; }
+  .choice .radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; flex: none; }
+  .choice.selected { border-color: var(--cc); background: color-mix(in srgb, var(--cc) 7%, white); }
+  .choice.selected .radio { border-color: var(--cc); }
+  .choice.selected .radio::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--cc); }
+  .choice .c-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--cc); color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+  .choice b { display: block; font-size: 15.5px; }
+  .choice small { display: block; color: var(--muted); font-size: 13px; }
+  .receipt { display: grid; gap: 10px; justify-items: start; }
+  .receipt-code { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: .06em; color: var(--ink); padding: 10px 16px; border-radius: 12px; background: var(--surface-2); border: 2px dashed var(--accent-line); }
+  .receipt-full { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+  .vec { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+  .bit { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; font-family: var(--mono); font-weight: 700; background: var(--surface-2); border: 1px solid var(--line); }
+  .bit.one { background: var(--cc); color: #fff; border-color: transparent; }
+  .proof-cell { display: grid; gap: 3px; }
+  .timing { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+  /* ── Pasul 4 ── */
+  .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .search { position: relative; flex: 1; min-width: 260px; }
+  .search input { width: 100%; font: inherit; font-family: var(--mono); padding: 11px 14px 11px 40px; border: 1px solid var(--line-2); border-radius: 10px; background: #fff; letter-spacing: .03em; }
+  .search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .board-meta { display: flex; gap: 10px 18px; flex-wrap: wrap; align-items: center; font-size: 13.5px; color: var(--muted); margin-bottom: 10px; }
+  .sim { display: grid; gap: 6px; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: 12px; font-size: 13.5px; color: #1d367f; }
+  .ct-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .ct { border: 1px solid var(--line); border-top: 3px solid var(--cc); border-radius: 10px; background: #fff; padding: 8px 12px; min-width: 0; }
+  .ct-name { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+  .full-hash { font-family: var(--mono); font-size: 11.5px; color: var(--muted); word-break: break-all; margin-top: 10px; }
+
+  /* ── Pasul 5 ── */
+  .dec-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .dec { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface-2); display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .dec.done { background: var(--ok-soft); border-color: var(--ok-line); }
+  .dec .kv { padding: 3px 0; }
+  .lockbar { display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 14px; }
+  .locks { display: flex; gap: 6px; }
+  .locks i { width: 30px; height: 8px; border-radius: 999px; background: var(--line-2); }
+  .locks i.on { background: var(--ok); }
+  .results { display: grid; gap: 4px; }
+  .result-row { display: grid; grid-template-columns: minmax(150px, 240px) 1fr 110px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .result-row:last-child { border-bottom: 0; }
+  .result-row .name { font-weight: 650; }
+  .result-row .name small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .bar { height: 16px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--cc); border-radius: 999px; transition: width .9s cubic-bezier(.2, .8, .2, 1); }
+  .result-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .result-row .num b { font-size: 22px; }
+  .result-row .num small { display: block; color: var(--muted); font-size: 12.5px; }
+  .winner { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ok); margin-left: 6px; }
+
+  /* ── Pasul 6 ── */
+  .checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .check { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; transition: border-color .2s, background .2s; }
+  .check .ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line-2); color: var(--muted); font-weight: 700; font-size: 13px; }
+  .check.running { border-color: var(--accent-line); background: #fbfcff; }
+  .check.running .ic { border-color: var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; }
+  .check.ok { border-color: var(--ok-line); }
+  .check.ok .ic { background: var(--ok); border-color: var(--ok); color: #fff; animation: pop .3s ease-out; }
+  .check.fail { border-color: var(--bad-line); background: #fffafa; }
+  .check.fail .ic { background: var(--bad); border-color: var(--bad); color: #fff; animation: pop .3s ease-out; }
+  .check.skip .ic { border-style: dashed; }
+  .check.skip { opacity: .75; }
+  @keyframes pop { 0% { transform: scale(.6); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .check h4 { margin: 0; font-size: 15.5px; }
+  .check p { margin: 2px 0 0; font-size: 13.5px; color: var(--muted); }
+  .check .detail { margin-top: 6px; font-size: 13.5px; color: var(--ink-2); }
+  .check.ok .detail { color: var(--ok); }
+  .problems { margin: 8px 0 0; padding-left: 18px; color: var(--bad); font-size: 13.5px; display: grid; gap: 3px; }
+  .verdict { margin-top: 16px; }
+
+  /* ── Atacuri ── */
+  .attack-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .attack-card { border-top: 4px solid var(--bad); display: grid; gap: 12px; align-content: start; }
+  .attack-card.span { grid-column: 1 / -1; }
+  .attack-card h3 { display: flex; align-items: center; gap: 10px; }
+  .attack-card h3 .n { width: 26px; height: 26px; border-radius: 8px; background: var(--bad-soft); color: var(--bad); display: grid; place-items: center; font-size: 13px; flex: none; }
+  .attack-card .sub { margin: 0; }
+  .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .log li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 14px; align-items: start; }
+  .log li .li-ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+  .log li.info .li-ic { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+  .log li.pass .li-ic { background: var(--accent-soft); color: var(--accent); }
+  .log li.blocked .li-ic { background: var(--ok); color: #fff; }
+  .log li.blocked { color: #0b5a3f; }
+  .log li.breach .li-ic { background: var(--bad); color: #fff; }
+  .log li.breach { color: #8a1f2a; }
+  .hash-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .hash-col { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; align-content: start; background: var(--surface-2); min-width: 0; }
+  .hash-col.lost { background: var(--bad-soft); border-color: var(--bad-line); }
+  .hash-col.safe { background: var(--ok-soft); border-color: var(--ok-line); }
+  .hash-col h4 { margin: 0; font-size: 15px; }
+  .space-eq { font-family: var(--mono); font-size: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .space-eq b { color: var(--bad); }
+  .inline-field { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+  .inline-field .field { flex: 1; min-width: 220px; }
+
+  /* ── Diverse ── */
+  .watermark { position: fixed; right: 14px; bottom: 12px; z-index: 50; font-size: 12px; font-weight: 600; color: var(--muted); background: rgba(255, 255, 255, .88); border: 1px dashed var(--line-2); padding: 4px 11px; border-radius: 999px; pointer-events: none; letter-spacing: .01em; }
+  #toasts { position: fixed; left: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 60; max-width: min(440px, calc(100vw - 32px)); }
+  .toast { background: #0f172a; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: 0 8px 24px rgba(15, 23, 42, .25); animation: toast-in .2s ease-out; }
+  .toast.bad { background: var(--bad); }
+  .toast.ok { background: var(--ok); }
+  @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+  .boot-error { max-width: 760px; margin: 40px auto; }
+  .boot-error code { background: rgba(0, 0, 0, .06); padding: 1px 6px; border-radius: 5px; }
+
+  @media (max-width: 980px) {
+    .grid.two, .grid.wide-left, .attack-grid, .hash-cols { grid-template-columns: 1fr; }
+    .trustee-grid, .dec-grid, .ct-grid { grid-template-columns: 1fr; }
+    .scan-zone { grid-template-columns: 1fr; }
+    .step-tab.attack { margin-left: 0; }
+  }
+  @media (max-width: 600px) {
+    .topbar-inner { padding: 10px 16px 0; }
+    main { padding: 20px 16px 110px; }
+    h2 { font-size: 22px; }
+    .methods, .form, .params { grid-template-columns: 1fr; }
+    .result-row { grid-template-columns: 1fr 80px; }
+    .result-row .bar { grid-column: 1 / -1; grid-row: 2; }
+    .status { display: none; }
+    .receipt-code { font-size: 19px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="watermark">Machetă demonstrativă – date fictive</div>
+<div id="toasts" aria-live="polite"></div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand-row">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16v8.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5z"/><path d="M8 11V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V11"/><path d="m10 7.5 1.5 1.5L14.5 6"/></svg>
+        </div>
+        <div>
+          <h1>Vot electronic verificabil</h1>
+          <p>ElGamal · dovezi zero-knowledge · bulletin board public · numărare homomorfică</p>
+        </div>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+    <nav class="steps" id="steps" aria-label="Pașii demonstrației">
+      <button class="step-tab" data-goto="1"><span class="num">1</span>Configurare</button>
+      <button class="step-tab" data-goto="2"><span class="num">2</span>Înregistrare</button>
+      <button class="step-tab" data-goto="3"><span class="num">3</span>Vot</button>
+      <button class="step-tab" data-goto="4"><span class="num">4</span>Bulletin board</button>
+      <button class="step-tab" data-goto="5"><span class="num">5</span>Numărare</button>
+      <button class="step-tab" data-goto="6"><span class="num">6</span>Verificare publică</button>
+      <button class="step-tab attack" data-goto="7"><span class="num">!</span>Demonstrații de atac</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div id="boot-error" class="boot-error" hidden></div>
+
+  <!-- ───────────── Pasul 1 ───────────── -->
+  <section class="step" id="step-1">
+    <div class="step-head">
+      <div class="kicker">Pasul 1 din 6</div>
+      <h2>Configurarea scrutinului</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>
+        <div>Stabilim candidații și generăm cheile de criptare. Cheia scrutinului este formată din cheile a trei „trustees” independenți: oricine poate cripta un vot, dar rezultatul poate fi deschis doar dacă toți trei colaborează.</div>
+      </div>
+    </div>
+    <div class="grid wide-left">
+      <div class="card">
+        <h3>Candidați (fictivi)</h3>
+        <p class="sub">Numele pot fi modificate înainte de generarea cheilor.</p>
+        <div class="cand-list" id="cand-list"></div>
+        <div class="params">
+          <div><span>Grup</span><b>MODP 2048 biți · RFC 3526</b></div>
+          <div><span>Generator</span><b>g = 2</b></div>
+          <div><span>Modul p (prim, 2048 biți)</span><code class="hx" id="p-hex"></code></div>
+          <div><span>Hash pentru Fiat–Shamir</span><b>SHA-256</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Cheile trustees</h3>
+        <p class="sub">Fiecare trustee își generează singur cheia secretă x și publică doar h = gˣ mod p.</p>
+        <div class="row">
+          <button class="btn primary" data-action="keygen" id="keygen-btn">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M17 6l2 2M14 9l2 2"/></svg>
+            Generează cheile
+          </button>
+          <button class="btn secondary" data-action="resetElection" id="reset-btn" hidden>Scrutin nou (resetează tot)</button>
+        </div>
+        <div id="keys-summary" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div id="keys-out"></div>
+    <div class="step-foot"><span></span><button class="btn ghost" data-goto="2">Pasul următor: Înregistrare →</button></div>
+  </section>
+
+  <!-- ───────────── Pasul 2 ───────────── -->
+  <section class="step" id="step-2" hidden>
+    <div class="step-head">
+      <div class="kicker">Pasul 2 din 6</div>
+      <h2>Înregistrarea alegătorului</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>
+        <div>Alegătorul își dovedește identitatea cu actul de identitate. Serverul nu păstrează CNP-ul, ci doar o „amprentă” HMAC calculată cu o cheie secretă: ajunge ca să recunoască un CNP deja folosit, dar din ea nu se poate reconstitui CNP-ul.</div>
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="card">
+        <h3>1. Identificare</h3>
+        <p class="sub">Ambele variante sunt simulate și completează date fictive.</p>
+        <div class="methods">
+          <button class="method" data-action="scanOcr" id="m-ocr">
+            <span class="m-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.7-2h6l1.7 2h1.8A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.6"/></svg></span>
+            <span><b>Scanare buletin (OCR)</b><small>Camera fotografiază actul, iar textul este recunoscut automat.</small></span>
+          </button>
+          <button class="method" data-action="scanNfc" id="m-nfc">
+            <span class="m-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 9.5a3.5 3.5 0 0 1 0 5"/><path d="M10.5 7a7 7 0 0 1 0 10"/><path d="M14 4.5a10.5 10.5 0 0 1 0 15"/><path d="M17.5 2.5a13.5 13.5 0 0 1 0 19"/></svg></span>
+            <span><b>Citire NFC (CEI)</b><small>Telefonul citește cipul cărții electronice de identitate.</small></span>
+          </button>
+        </div>
+        <div class="scan-zone" id="scan-zone"></div>
+        <div class="form">
+          <div class="field"><label for="f-last">Nume</label><input id="f-last" readonly placeholder="—"></div>
+          <div class="field"><label for="f-first">Prenume</label><input id="f-first" readonly placeholder="—"></div>
+          <div class="field full"><label for="f-cnp">CNP (poate fi și tastat)</label><input id="f-cnp" class="cnp" inputmode="numeric" maxlength="13" autocomplete="off" spellcheck="false" placeholder="13 cifre"></div>
+          <div class="field full"><div class="cnp-check" id="cnp-check"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>2. Ce ajunge pe server</h3>
+        <p class="sub">CNP-ul trece prin HMAC-SHA256 cu o cheie secretă a serverului, care nu părăsește modulul securizat.</p>
+        <div id="reg-flow"></div>
+        <div class="row" style="margin-top:16px">
+          <button class="btn primary" data-action="register" id="register-btn">Înregistrează alegătorul</button>
+        </div>
+        <div id="reg-result" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <div class="row"><h3>Baza de date a serverului</h3><span class="spacer"></span><span class="muted small" id="db-count"></span></div>
+      <p class="sub">Exact ce este stocat. Nicio coloană nu conține CNP-ul, numele sau seria actului.</p>
+      <div id="voter-db"></div>
+    </div>
+    <div class="step-foot"><button class="btn ghost" data-goto="1">← Configurare</button><button class="btn ghost" data-goto="3">Pasul următor: Vot →</button></div>
+  </section>
+
+  <!-- ───────────── Pasul 3 ───────────── -->
+  <section class="step" id="step-3" hidden>
+    <div class="step-head">
+      <div class="kicker">Pasul 3 din 6</div>
+      <h2>Votul criptat</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>
+        <div>Votul devine o listă de numere criptate, câte unul pentru fiecare candidat (1 = ales, 0 = neales). Dovezile „zero-knowledge” arată că lista e corectă, cu exact un „1”, fără să dezvăluie unde se află.</div>
+      </div>
+    </div>
+    <div id="vote-voter"></div>
+    <div class="grid two">
+      <div class="card">
+        <h3>Buletinul de vot</h3>
+        <p class="sub">Alege un singur candidat.</p>
+        <div class="choices" id="ballot-choices"></div>
+        <div class="row" style="margin-top:16px">
+          <button class="btn primary" data-action="cast" id="cast-btn">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            Criptează și trimite votul
+          </button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Codul de urmărire</h3>
+        <p class="sub">Hash-ul SHA-256 al buletinului tău criptat. Cu el îți poți găsi votul pe board.</p>
+        <div id="receipt"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h3>Ce primește serverul</h3>
+      <p class="sub">Criptotexte ElGamal (α, β) și dovezi: numere de 2048 de biți care nu spun nimic despre vot (afișate trunchiat).</p>
+      <div id="vote-crypto"></div>
+    </div>
+    <div class="step-foot"><button class="btn ghost" data-goto="2">← Înregistrare</button><button class="btn ghost" data-goto="4">Pasul următor: Bulletin board →</button></div>
+  </section>
+
+  <!-- ───────────── Pasul 4 ───────────── -->
+  <section class="step" id="step-4" hidden>
+    <div class="step-head">
+      <div class="kicker">Pasul 4 din 6</div>
+      <h2>Bulletin board public</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>
+        <div>Toate buletinele criptate sunt publice, ca într-o urnă transparentă în care nimeni nu poate citi voturile. Fiecare intrare conține hash-ul celei anterioare, așa că orice modificare rupe lanțul.</div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="board-search" placeholder="Caută după codul de urmărire, ex. 3FA1-9BC2" autocomplete="off" spellcheck="false" aria-label="Caută după codul de urmărire">
+      </div>
+      <button class="btn primary" data-action="simulate" id="simulate-btn">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a6.5 6.5 0 0 1 3 6"/></svg>
+        Simulează 20 de alegători
+      </button>
+    </div>
+    <div id="sim-progress"></div>
+    <div id="search-result"></div>
+    <div class="board-meta" id="board-meta"></div>
+    <div id="board-table"></div>
+    <div class="step-foot"><button class="btn ghost" data-goto="3">← Vot</button><button class="btn ghost" data-goto="5">Pasul următor: Numărare →</button></div>
+  </section>
+
+  <!-- ───────────── Pasul 5 ───────────── -->
+  <section class="step" id="step-5" hidden>
+    <div class="step-head">
+      <div class="kicker">Pasul 5 din 6</div>
+      <h2>Numărarea voturilor</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>
+        <div>Nimeni nu deschide buletine individuale: criptotextele se înmulțesc între ele, iar asta adună voturile „sub criptare”. Se decriptează doar totalul, și doar cu participarea tuturor celor trei trustees.</div>
+      </div>
+    </div>
+    <div id="tally-notice"></div>
+    <div class="card">
+      <div class="row">
+        <div><h3>1. Agregarea homomorfică</h3><p class="sub" style="margin:0">Π gᵐⁱ·hʳⁱ = g<sup>Σm</sup>·h<sup>Σr</sup> — produsul criptotextelor criptează suma voturilor.</p></div>
+        <span class="spacer"></span>
+        <button class="btn primary" data-action="aggregate" id="aggregate-btn">Calculează agregatul</button>
+      </div>
+      <div id="agg-out" style="margin-top:14px"></div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <div class="row">
+        <div><h3>2. Decriptarea parțială</h3><p class="sub" style="margin:0">Fiecare trustee calculează dᵢ = α<sup>xᵢ</sup> cu cheia sa și dovedește (Chaum–Pedersen) că a folosit cheia corectă.</p></div>
+        <span class="spacer"></span>
+        <button class="btn secondary" data-action="partialAll" id="partial-all-btn">Toți trustees</button>
+      </div>
+      <div id="dec-out" style="margin-top:14px"></div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h3>3. Rezultatul final</h3>
+      <p class="sub">gᵐ = β / (d₁·d₂·d₃), apoi m se află încercând pe rând g⁰, g¹, g², … (logaritm discret mic).</p>
+      <div id="result-out"></div>
+    </div>
+    <div class="step-foot"><button class="btn ghost" data-goto="4">← Bulletin board</button><button class="btn ghost" data-goto="6">Pasul următor: Verificare publică →</button></div>
+  </section>
+
+  <!-- ───────────── Pasul 6 ───────────── -->
+  <section class="step" id="step-6" hidden>
+    <div class="step-head">
+      <div class="kicker">Pasul 6 din 6</div>
+      <h2>Verificarea publică</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>
+        <div>Oricine (un observator, un partid, un jurnalist) poate reface toate calculele folosind doar datele publice. Dacă ceva a fost modificat, verificarea arată exact unde.</div>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn primary" data-action="verify" id="verify-btn">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>
+        Rulează toate verificările
+      </button>
+      <span class="muted small" id="verify-hint"></span>
+    </div>
+    <ol class="checks" id="checks"></ol>
+    <div class="verdict" id="verdict"></div>
+    <div class="step-foot"><button class="btn ghost" data-goto="5">← Numărare</button><button class="btn ghost" data-goto="7">Demonstrații de atac →</button></div>
+  </section>
+
+  <!-- ───────────── Atacuri ───────────── -->
+  <section class="step attack-section" id="step-7" hidden>
+    <div class="step-head">
+      <div class="kicker">Demonstrații de atac</div>
+      <h2>Ce se întâmplă dacă cineva trișează?</h2>
+      <div class="explain"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>
+        <div>Fiecare atac de mai jos rulează pe același scrutin. Sistemul fie îl respinge pe loc, fie îl prinde la verificarea publică.</div>
+      </div>
+    </div>
+    <div class="attack-grid">
+      <div class="card attack-card">
+        <h3><span class="n">1</span>Votează de două ori</h3>
+        <p class="sub">Un alegător care a votat deja trimite încă un buletin, apoi încearcă să se înregistreze din nou cu același CNP.</p>
+        <div><button class="btn danger" data-action="atkDouble">Încearcă un vot dublu</button></div>
+        <div id="atk-double-out"></div>
+      </div>
+      <div class="card attack-card">
+        <h3><span class="n">2</span>Vot invalid</h3>
+        <p class="sub">Un client modificat criptează valoarea 2 pentru un singur candidat, ca să-i dea două voturi dintr-un buletin.</p>
+        <div class="row">
+          <button class="btn danger" data-action="atkInvalid">Trimite un vot invalid (2 voturi pentru un candidat)</button>
+          <button class="btn secondary small" data-action="atkInvalidSly" title="2 voturi pentru un candidat și −1 pentru altul: suma rămâne 1">Varianta vicleană: +2 / −1</button>
+        </div>
+        <div id="atk-invalid-out"></div>
+      </div>
+      <div class="card attack-card span">
+        <h3><span class="n">3</span>Atacatorul modifică un buletin pe board</h3>
+        <p class="sub">Un administrator corupt schimbă direct în baza de date un criptotext publicat, ca să adauge un vot candidatului său. Nu cunoaște votul inițial și nici valorile secrete din dovezi.</p>
+        <div class="row">
+          <button class="btn danger" data-action="atkTamper" id="atk-tamper-btn">Modifică un buletin</button>
+          <button class="btn primary" data-action="atkTamperVerify" id="atk-tamper-verify">Rulează verificarea publică →</button>
+          <button class="btn secondary" data-action="atkRestore" id="atk-restore">Restaurează board-ul</button>
+        </div>
+        <div id="atk-tamper-out"></div>
+      </div>
+      <div class="card attack-card span">
+        <h3><span class="n">4</span>SHA-256 simplu vs HMAC</h3>
+        <p class="sub">Baza de date a fost furată. Dacă serverul ar fi salvat SHA-256(CNP), atacatorul ar putea recupera CNP-ul, pentru că pentru o dată de naștere cunoscută există foarte puține CNP-uri posibile.</p>
+        <div class="inline-field">
+          <div class="field"><label for="atk-cnp">CNP țintă (fictiv)</label><input id="atk-cnp" class="cnp" inputmode="numeric" maxlength="13" autocomplete="off" spellcheck="false"></div>
+          <button class="btn secondary" data-action="atkNewCnp">CNP fictiv nou</button>
+          <button class="btn danger" data-action="atkHash">Rulează atacul de dicționar</button>
+        </div>
+        <div id="atk-hash-space"></div>
+        <div id="atk-hash-out"></div>
+      </div>
+    </div>
+    <div class="step-foot"><button class="btn ghost" data-goto="6">← Verificare publică</button><span></span></div>
+  </section>
+</main>
+
+<script>
+  // Dacă modulul nu pornește (de ex. pagina a fost deschisă direct ca fișier), arătăm instrucțiunile.
+  setTimeout(function () {
+    if (window.__machetaReady) return;
+    var box = document.getElementById('boot-error');
+    if (box && box.hidden) {
+      box.hidden = false;
+      box.innerHTML = '<div class="notice bad"><div><b>Macheta nu a putut porni.</b><br>Cel mai probabil pagina a fost deschisă direct ca fișier. ' +
+        'Pornește un server local în folderul <code>macheta-evoting</code> cu <code>npx serve .</code> și deschide <code>http://localhost:3000</code>.</div></div>';
+    }
+  }, 2500);
+</script>
+
+<script type="module">
+let C;
+try {
+  C = await import('./crypto.mjs');
+} catch (err) {
+  bootError(err);
+  throw err;
+}
+
+function bootError(err) {
+  const box = document.getElementById('boot-error');
+  box.hidden = false;
+  box.innerHTML = `<div class="notice bad"><div><b>Macheta nu a putut porni.</b><br>${escapeHtml(err?.message ?? err)}<br><br>
+    Pornește un server local în folderul <code>macheta-evoting</code> cu <code>npx serve .</code> și deschide <code>http://localhost:3000</code>
+    (nu fișierul direct și nu adresa IP a calculatorului).</div></div>`;
+}
+
+// ───────────── Utilitare ─────────────
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+const esc = escapeHtml;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const yieldUI = () => new Promise((r) => setTimeout(r, 16));
+const fmt = (n) => Number(n).toLocaleString('ro-RO');
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString('ro-RO');
+const fmtDate = (ymd) => ymd.split('-').reverse().join('.');
+const fmtMs = (ms) => (ms >= 1000 ? `${(ms / 1000).toLocaleString('ro-RO', { maximumFractionDigits: 2 })} s` : ms < 1 ? 'sub 1 ms' : `${Math.round(ms)} ms`);
+const pick = (arr) => arr[C.randomInt(arr.length)];
+const hexOf = (v) => (typeof v === 'bigint' ? v.toString(16) : String(v));
+
+function hx(v, head = 8, tail = 6, cls = '') {
+  const s = hexOf(v);
+  const short = s.length <= head + tail + 1 ? s : `${s.slice(0, head)}…${s.slice(-tail)}`;
+  return `<code class="hx ${cls}" title="${s}">${short}</code>`;
+}
+function chainHx(hash) {
+  if (hash === C.GENESIS_HASH) return `<code class="hx chain" style="--h:220" title="${hash}">geneză 000…0</code>`;
+  return `<code class="hx chain" style="--h:${parseInt(hash.slice(0, 4), 16) % 360}" title="${hash}">${hash.slice(0, 10)}…</code>`;
+}
+const fmtCode = (hex) => hex.slice(0, 16).toUpperCase().match(/.{4}/g).join('-');
+const initials = (name) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+  x: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>',
+  info: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.01"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+};
+const notice = (type, html) => `<div class="notice ${type}">${ICON[{ ok: 'shield', bad: 'alert', warn: 'alert', info: 'info' }[type]]}<div>${html}</div></div>`;
+
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  $('#toasts').append(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+// ───────────── Date fictive ─────────────
+const PARTIES = ['Partidul Alfa', 'Alianța Beta', 'Mișcarea Gama'];
+const COLORS = ['var(--c0)', 'var(--c1)', 'var(--c2)'];
+const DEFAULT_CANDIDATES = ['Elena Marinescu', 'Victor Constantinescu', 'Ioana Dragomir'];
+const TRUSTEE_ROLES = ['Comisia electorală', 'Observatori independenți', 'Reprezentanții candidaților'];
+const METHOD = {
+  ocr: { label: 'Scanare buletin (OCR)', short: 'OCR' },
+  nfc: { label: 'Citire NFC (CEI)', short: 'NFC' },
+};
+const TRUST_TEXT = {
+  optic: 'Datele au fost citite dintr-o fotografie a actului. Un document falsificat suficient de bine ar putea trece.',
+  criptografic: 'Datele vin din cipul cărții electronice de identitate și sunt semnate digital de emitent; orice modificare ar invalida semnătura.',
+};
+const FIRST_M = ['Andrei', 'Mihai', 'Alexandru', 'Ion', 'Radu', 'Cristian', 'Florin', 'Gabriel', 'Bogdan', 'Vlad', 'Dan', 'Sorin', 'Adrian', 'Ștefan', 'Tudor', 'Paul'];
+const FIRST_F = ['Maria', 'Elena', 'Ioana', 'Ana', 'Andreea', 'Cristina', 'Diana', 'Alina', 'Raluca', 'Simona', 'Laura', 'Irina', 'Bianca', 'Corina', 'Teodora', 'Oana'];
+const LAST = ['Popescu', 'Ionescu', 'Popa', 'Dumitru', 'Stan', 'Stoica', 'Gheorghe', 'Rusu', 'Munteanu', 'Matei', 'Constantin', 'Șerban', 'Moldovan', 'Lazăr', 'Ene', 'Barbu', 'Toma', 'Nistor', 'Florea', 'Dobre'];
+
+function fakePerson() {
+  const cnp = C.randomCnp();
+  const info = C.validateCnp(cnp);
+  const last = pick(LAST);
+  const first = pick(info.sex === 'M' ? FIRST_M : FIRST_F);
+  return { cnp, lastName: last.toUpperCase(), firstName: first, fullName: `${first} ${last}`, ...info };
+}
+
+const trustBadge = (trust) =>
+  trust === 'criptografic' ? '<span class="badge ok">criptografic</span>' : '<span class="badge warn">optic</span>';
+
+// ───────────── Starea aplicației (doar în memorie) ─────────────
+const server = await C.SimulatedServer.create();
+const state = {
+  step: 1,
+  candidates: [...DEFAULT_CANDIDATES],
+  election: null,
+  trustees: null,
+  keygenMs: 0,
+  scan: null,           // { method, phase, person }
+  hmacPreview: null,    // { cnp, hmac }
+  regResult: null,
+  currentVoter: null,   // { id, name, method, trust, cnp } — CNP-ul rămâne doar „pe dispozitivul” alegătorului
+  choice: null,
+  lastVote: null,
+  myCodes: new Set(),
+  search: '',
+  expanded: null,
+  sim: null,
+  tally: null,
+  tallyNotice: '',
+  verify: null,
+  flagged: new Set(),
+  tamper: null,
+  atk: { double: null, invalid: null, hash: null },
+  busy: null,
+};
+
+const entries = () => server.board?.entries ?? [];
+const cands = () => state.election?.candidates ?? state.candidates;
+
+// Board-ul s-a schimbat pe cale legală (buletin nou) → numărarea și verificarea devin depășite.
+function onBoardChanged() {
+  if (state.tally) {
+    state.tally = null;
+    state.tallyNotice = 'Au apărut buletine noi după numărare, așa că agregatul a fost resetat. Recalculează-l.';
+  }
+  state.verify = null;
+  state.flagged = new Set();
+}
+
+// ───────────── Navigare ─────────────
+const STEP_COUNT = 7;
+function isDone(step) {
+  switch (step) {
+    case 1: return !!state.election;
+    case 2: return server.voters.size > 0;
+    case 3: return !!state.lastVote;
+    case 4: return entries().length > 0;
+    case 5: return !!state.tally?.counts;
+    case 6: return !!(state.verify?.finished && state.verify.ok);
+    default: return false;
+  }
+}
+
+function goTo(step) {
+  state.step = Math.min(STEP_COUNT, Math.max(1, step));
+  for (let i = 1; i <= STEP_COUNT; i++) $(`#step-${i}`).hidden = i !== state.step;
+  renderNav();
+  window.scrollTo({ top: 0 });
+}
+
+function renderNav() {
+  $$('.step-tab').forEach((tab) => {
+    const s = Number(tab.dataset.goto);
+    tab.classList.toggle('active', s === state.step);
+    tab.classList.toggle('done', isDone(s) && s !== state.step);
+    if (s <= 6) tab.querySelector('.num').innerHTML = isDone(s) && s !== state.step ? '✓' : String(s);
+  });
+}
+
+function renderStatus() {
+  const n = entries().length;
+  const chips = [];
+  if (state.currentVoter) chips.push(`<span class="chip voter">Alegător: <b>${esc(state.currentVoter.name)}</b></span>`);
+  chips.push(`<span class="chip ${state.election ? 'on' : ''}">Chei: <b>${state.election ? 'generate' : '—'}</b></span>`);
+  chips.push(`<span class="chip">Înregistrați: <b>${server.voters.size}</b></span>`);
+  chips.push(`<span class="chip">Buletine: <b>${n}</b></span>`);
+  chips.push(`<span class="chip ${state.tally?.counts ? 'on' : ''}">Rezultat: <b>${state.tally?.counts ? 'publicat' : '—'}</b></span>`);
+  $('#status').innerHTML = chips.join('');
+}
+
+// ───────────── Pasul 1: configurare ─────────────
+function renderSetup() {
+  const list = $('#cand-list');
+  if (!list.children.length) {
+    list.innerHTML = state.candidates.map((name, i) => `
+      <div class="cand-row" style="--cc:${COLORS[i]}">
+        <span class="cand-dot">${String.fromCharCode(65 + i)}</span>
+        <input class="cand-name" data-i="${i}" value="${esc(name)}" maxlength="40" aria-label="Numele candidatului ${i + 1}">
+        <span class="cand-party">${PARTIES[i]}</span>
+      </div>`).join('');
+  }
+  $$('.cand-name').forEach((input, i) => {
+    input.disabled = !!state.election;
+    if (state.election) input.value = state.election.candidates[i];
+  });
+  $('#keygen-btn').hidden = !!state.election;
+  $('#reset-btn').hidden = !state.election;
+
+  const el = state.election;
+  if (!el) {
+    $('#keys-summary').innerHTML = '<div class="empty">Cheile nu au fost generate încă.</div>';
+    $('#keys-out').innerHTML = '';
+    return;
+  }
+  $('#keys-summary').innerHTML = `
+    <div class="combined">
+      <div class="formula">h = h₁ · h₂ · h₃ mod p</div>
+      <div>${hx(el.pk, 18, 10, 'big')}</div>
+      <div class="muted small">Cheia publică a scrutinului · ID scrutin ${hx(el.id, 10, 4)} · generate în ${fmtMs(state.keygenMs)}</div>
+    </div>`;
+  $('#keys-out').innerHTML = `
+    <div class="trustee-grid">${el.trustees.map((t, i) => `
+      <div class="trustee">
+        <div class="trustee-head"><span class="t-avatar">T${i + 1}</span><div><b>${esc(t.name)}</b><small>${TRUSTEE_ROLES[i]}</small></div></div>
+        <div class="kv"><span>Cheie publică h${'₁₂₃'[i]} = g<sup>x${'₁₂₃'[i]}</sup></span>${hx(t.pk)}</div>
+        <div class="kv"><span>Dovadă Schnorr (știe x${'₁₂₃'[i]})</span><span class="badge ok">${ICON.check} validă</span></div>
+        <div class="kv"><span>Cheie secretă x${'₁₂₃'[i]}</span><span class="secret">${ICON.lock} rămâne doar la trustee</span></div>
+      </div>`).join('')}
+    </div>`;
+}
+
+async function keygen() {
+  const names = $$('.cand-name').map((input, i) => input.value.trim() || DEFAULT_CANDIDATES[i]);
+  if (new Set(names).size !== names.length) {
+    toast('Candidații trebuie să aibă nume diferite.', 'bad');
+    return;
+  }
+  state.candidates = names;
+  const t0 = performance.now();
+  const { election, trustees } = await C.createElection(names);
+  state.keygenMs = performance.now() - t0;
+  state.election = election;
+  state.trustees = trustees;
+  server.startElection(election);
+  resetElectionState();
+  toast('Cheile au fost generate. Scrutinul este deschis.', 'ok');
+}
+
+function resetElectionState() {
+  state.choice = null;
+  state.lastVote = null;
+  state.myCodes = new Set();
+  state.sim = null;
+  state.tally = null;
+  state.tallyNotice = '';
+  state.verify = null;
+  state.flagged = new Set();
+  state.tamper = null;
+  state.expanded = null;
+  state.atk = { double: null, invalid: null, hash: state.atk.hash };
+}
+
+function resetElection() {
+  state.election = null;
+  state.trustees = null;
+  server.election = null;
+  server.board = null;
+  for (const v of server.voters.values()) v.voted = false;
+  resetElectionState();
+}
+
+// ───────────── Pasul 2: înregistrare ─────────────
+function mrz(p) {
+  return `ID&lt;DEMO&lt;${p.lastName.normalize('NFD').replace(/[^\x41-\x5a]/g, '')}&lt;&lt;${p.firstName.toUpperCase().normalize('NFD').replace(/[^\x41-\x5a]/g, '')}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;`;
+}
+
+function renderScan() {
+  const s = state.scan;
+  $('#m-ocr').classList.toggle('selected', s?.method === 'ocr');
+  $('#m-nfc').classList.toggle('selected', s?.method === 'nfc');
+  if (!s) {
+    $('#scan-zone').innerHTML = '';
+    return;
+  }
+  const p = s.person;
+  const scanning = s.phase === 'scanning';
+  const fields = p && !scanning
+    ? `<div><small>Nume</small><b>${esc(p.lastName)}</b></div><div><small>Prenume</small><b>${esc(p.firstName)}</b></div><div><small>CNP</small><b class="mono">${p.cnp}</b></div>`
+    : '<div class="ph"></div><div class="ph"></div><div class="ph short"></div><div class="ph short"></div>';
+  const overlay = scanning ? (s.method === 'ocr' ? '<div class="scanline"></div>' : '<div class="waves"><i></i><i></i><i></i></div>') : '';
+  const status = scanning
+    ? `<span class="row"><span class="spinner" style="color:var(--accent)"></span>${s.method === 'ocr' ? 'Se fotografiază actul și se recunoaște textul…' : 'Se citește cipul prin NFC…'}</span>`
+    : s.method === 'ocr'
+      ? `<span class="badge ok">${ICON.check} Text recunoscut (OCR)</span><span>Zona MRZ citită, încredere OCR 97%.</span><span class="muted">Nivel de încredere: ${trustBadge('optic')}</span>`
+      : `<span class="badge ok">${ICON.check} Cip citit (DG1: date personale)</span><span>Semnătura emitentului verificată (autentificare pasivă).</span><span class="muted">Nivel de încredere: ${trustBadge('criptografic')}</span>`;
+  $('#scan-zone').innerHTML = `
+    <div class="idcard">
+      <div class="idcard-top"><span>DOCUMENT DE IDENTITATE</span><span class="spec">SPECIMEN · FICTIV</span></div>
+      <div class="idcard-body"><div class="photo"></div><div class="idcard-fields">${fields}</div></div>
+      ${s.method === 'nfc' ? '<div class="gold"></div>' : ''}
+      <div class="mrz">${p && !scanning ? mrz(p) : 'ID&lt;DEMO&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;'}</div>
+      ${overlay}
+    </div>
+    <div class="scan-status">${status}</div>`;
+}
+
+async function scan(method) {
+  state.scan = { method, phase: 'scanning', person: null };
+  state.regResult = null;
+  renderAll();
+  await sleep(method === 'nfc' ? 1400 : 1100);
+  const person = fakePerson();
+  state.scan = { method, phase: 'done', person };
+  $('#f-last').value = person.lastName;
+  $('#f-first').value = person.firstName;
+  $('#f-cnp').value = person.cnp;
+  await updateHmacPreview();
+}
+
+let previewSeq = 0;
+async function updateHmacPreview() {
+  const cnp = $('#f-cnp').value.trim();
+  const seq = ++previewSeq;
+  const hmac = C.validateCnp(cnp).ok ? await server.fingerprint(cnp) : null;
+  if (seq !== previewSeq) return;
+  state.hmacPreview = { cnp, hmac };
+  renderRegistration();
+  applyBusy();
+}
+
+function renderRegistration() {
+  renderScan();
+  const cnp = $('#f-cnp').value.trim();
+  const info = C.validateCnp(cnp);
+  const check = $('#cnp-check');
+  if (!cnp) {
+    check.className = 'cnp-check';
+    check.textContent = '';
+  } else if (info.ok) {
+    check.className = 'cnp-check ok';
+    check.innerHTML = `✓ Format valid · ${info.sex === 'M' ? 'bărbat' : 'femeie'} · născut(ă) ${fmtDate(info.birthDate)} · jud. ${esc(info.county)}`;
+  } else {
+    check.className = 'cnp-check bad';
+    check.textContent = `✗ CNP invalid: ${info.why}`;
+  }
+
+  const s = state.scan;
+  const edited = s?.person && cnp !== s.person.cnp;
+  const trust = s?.phase === 'done' ? C.ID_METHODS[s.method].trust : null;
+  const preview = state.hmacPreview?.cnp === cnp ? state.hmacPreview.hmac : null;
+  $('#reg-flow').innerHTML = `
+    <div class="flow">
+      <div class="flow-box">
+        <div class="flow-label"><span>CNP introdus</span><span class="badge muted">nu se salvează</span></div>
+        <div class="flow-val cnp-big">${cnp ? esc(cnp) : '<span class="muted">—</span>'}</div>
+      </div>
+      <div class="flow-arrow">HMAC-SHA256(cheie secretă server, CNP)</div>
+      <div class="flow-box saved">
+        <div class="flow-label"><span>Se salvează în baza de date</span><span class="badge ok">doar acest hash</span></div>
+        <div class="flow-val">${preview ?? '<span class="muted">— (introdu un CNP valid)</span>'}</div>
+        <div class="not-saved"><span>CNP</span><span>nume</span><span>prenume</span><span>seria actului</span><span>fotografie</span></div>
+      </div>
+      ${trust ? `<div class="trust-box ${edited ? 'optic' : trust}">
+        <div class="row"><b>Nivel de încredere:</b> ${edited ? '<span class="badge warn">CNP tastat manual</span>' : trustBadge(trust)}<span class="muted small">${METHOD[s.method].label}</span></div>
+        <p>${edited ? 'CNP-ul a fost modificat de mână, deci nu mai provine din document.' : TRUST_TEXT[trust]}</p>
+      </div>` : ''}
+    </div>`;
+
+  $('#register-btn').disabled = !s || s.phase !== 'done' || !info.ok;
+
+  const r = state.regResult;
+  let html = '';
+  if (r?.ok) {
+    html = notice('ok', `<b>Alegător înregistrat.</b> În baza de date a intrat doar HMAC-ul ${hx(r.id)}. Alegătorul este autentificat și poate vota.
+      <div class="row" style="margin-top:8px"><button class="btn primary small" data-goto="3">Mergi la vot →</button></div>
+      <div class="small" style="margin-top:8px">Apasă din nou „Înregistrează” cu același CNP: cererea va fi respinsă.</div>`);
+  } else if (r?.code === 'duplicate') {
+    html = notice('bad', `<b>Respins: acest CNP este deja înregistrat.</b> Serverul a recalculat HMAC-ul (${hx(r.id)}) și l-a găsit în baza de date, fără să fi stocat vreodată CNP-ul.`);
+  } else if (r) {
+    html = notice('bad', `<b>Respins:</b> ${esc(r.reason)}`);
+  }
+  $('#reg-result').innerHTML = html;
+
+  const voters = [...server.voters.values()].reverse();
+  $('#db-count').textContent = `${fmt(voters.length)} înregistrări`;
+  $('#voter-db').innerHTML = voters.length
+    ? `<div class="table-wrap"><table class="tbl">
+        <thead><tr><th>#</th><th>HMAC-SHA256(CNP)</th><th>Metodă</th><th>Nivel de încredere</th><th>Înregistrat la</th><th>A votat</th></tr></thead>
+        <tbody>${voters.slice(0, 10).map((v, i) => `
+          <tr class="${v.id === state.currentVoter?.id ? 'current' : ''}">
+            <td class="idx">${voters.length - i}</td>
+            <td>${hx(v.id, 16, 8)}</td>
+            <td>${METHOD[v.method].short}</td>
+            <td>${trustBadge(v.trust)}</td>
+            <td>${fmtTime(v.registeredAt)}</td>
+            <td>${v.voted ? '<span class="badge ok">da</span>' : '<span class="badge muted">nu</span>'}</td>
+          </tr>`).join('')}
+        </tbody></table></div>
+        ${voters.length > 10 ? `<p class="muted small" style="margin:8px 0 0">… și încă ${voters.length - 10} înregistrări mai vechi.</p>` : ''}`
+    : '<div class="empty">Baza de date este goală.</div>';
+}
+
+async function register() {
+  const cnp = $('#f-cnp').value.trim();
+  const s = state.scan;
+  if (!s?.person) {
+    toast('Alege mai întâi o metodă de identificare.', 'bad');
+    return;
+  }
+  const res = await server.register(cnp, s.method);
+  state.regResult = res;
+  if (res.ok) {
+    state.currentVoter = {
+      id: res.id,
+      name: s.person.fullName,
+      method: s.method,
+      trust: res.record.trust,
+      cnp,
+    };
+    state.choice = null;
+  }
+}
+
+// ───────────── Pasul 3: vot ─────────────
+function renderVote() {
+  const v = state.currentVoter;
+  const rec = v && server.voters.get(v.id);
+  let bar;
+  if (!state.election) {
+    bar = notice('warn', 'Scrutinul nu este configurat. <button class="btn secondary small" data-goto="1">Generează cheile (pasul 1)</button>');
+  } else if (!v) {
+    bar = notice('info', 'Niciun alegător autentificat. <button class="btn secondary small" data-goto="2">Înregistrează un alegător (pasul 2)</button>');
+  } else {
+    bar = `<div class="voter-bar">
+      <span class="v-avatar">${esc(initials(v.name))}</span>
+      <div><b>${esc(v.name)}</b><div class="muted small">autentificat prin ${METHOD[v.method].label} · HMAC ${hx(v.id)}</div></div>
+      ${trustBadge(v.trust)}<span class="spacer"></span>
+      ${rec?.voted ? '<span class="badge ok">a votat</span>' : '<span class="badge info">poate vota</span>'}
+    </div>`;
+  }
+  $('#vote-voter').innerHTML = bar;
+
+  const canVote = !!(state.election && rec && !rec.voted);
+  $('#ballot-choices').innerHTML = cands().map((name, i) => `
+    <button class="choice ${state.choice === i ? 'selected' : ''}" style="--cc:${COLORS[i]}" data-action="choose" data-i="${i}" data-sync="1" ${canVote ? '' : 'disabled'}>
+      <span class="radio"></span>
+      <span class="c-avatar">${esc(initials(name))}</span>
+      <span><b>${esc(name)}</b><small>${PARTIES[i]}</small></span>
+    </button>`).join('');
+  $('#cast-btn').disabled = !canVote || state.choice === null;
+
+  const lv = state.lastVote && state.lastVote.voterId === v?.id ? state.lastVote : null;
+  if (lv) {
+    const e = lv.entry;
+    $('#receipt').innerHTML = `
+      <div class="receipt">
+        <div class="receipt-code">${fmtCode(e.trackingCode)}</div>
+        <div class="receipt-full">${e.trackingCode}</div>
+        <div class="muted small">Publicat pe board la poziția <b>#${e.index}</b>, ora ${fmtTime(e.time)}.</div>
+        <div class="row">
+          <button class="btn secondary small" data-action="copyCode" data-sync="1">Copiază codul</button>
+          <button class="btn primary small" data-action="findMine" data-sync="1">Caută-l pe board →</button>
+        </div>
+      </div>`;
+    $('#vote-crypto').innerHTML = `
+      <div class="row" style="margin-bottom:12px"><span class="muted">Vectorul tău (rămâne doar pe dispozitiv):</span>
+        ${lv.plaintexts.map((m, i) => `<span class="bit ${m ? 'one' : ''}" style="--cc:${COLORS[i]}">${m}</span>`).join('')}</div>
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>Candidat</th><th class="math">α = gʳ</th><th class="math">β = gᵐ · hʳ</th><th>Dovada „0 sau 1”</th><th>Server</th></tr></thead>
+        <tbody>${lv.ballot.ciphertexts.map((ct, i) => {
+          const [p0, p1] = lv.ballot.proofs[i];
+          return `<tr>
+            <td><span class="cand-tag" style="--cc:${COLORS[i]}">${esc(cands()[i])}</span></td>
+            <td>${hx(ct.alpha)}</td>
+            <td>${hx(ct.beta)}</td>
+            <td><div class="proof-cell"><span class="small muted">c₀ ${hx(p0.c, 6, 4)} c₁ ${hx(p1.c, 6, 4)}</span><span class="small muted">z₀ ${hx(p0.z, 6, 4)} z₁ ${hx(p1.z, 6, 4)}</span></div></td>
+            <td>${lv.verification.candidates[i].ok ? `<span class="badge ok">${ICON.check} verificată</span>` : '<span class="badge bad">invalidă</span>'}</td>
+          </tr>`;
+        }).join('')}
+          <tr>
+            <td><b>Suma = 1</b></td>
+            <td colspan="2" class="small muted">(Πα, Πβ / g) are aceeași „formă” ca (g, h) ⇒ exact un vot</td>
+            <td><div class="proof-cell"><span class="small muted">c ${hx(lv.ballot.sumProof.c, 6, 4)} z ${hx(lv.ballot.sumProof.z, 6, 4)}</span></div></td>
+            <td>${lv.verification.sum.ok ? `<span class="badge ok">${ICON.check} verificată</span>` : '<span class="badge bad">invalidă</span>'}</td>
+          </tr>
+        </tbody></table></div>
+      <div class="timing">Criptare și dovezi pe dispozitiv: ${fmtMs(lv.encMs)} · verificarea dovezilor pe server: ${fmtMs(lv.serverMs)}. Serverul a acceptat buletinul fără să afle votul.</div>`;
+  } else {
+    $('#receipt').innerHTML = '<div class="empty">Codul apare după ce votezi.</div>';
+    $('#vote-crypto').innerHTML = '<div class="empty">După vot, aici apar criptotextele și dovezile trimise serverului.</div>';
+  }
+}
+
+async function cast() {
+  const v = state.currentVoter;
+  if (!v || state.choice === null) return;
+  const t0 = performance.now();
+  const enc = await C.encryptBallot(state.election, state.choice);
+  const t1 = performance.now();
+  const res = await server.castBallot(v.id, enc.ballot);
+  const t2 = performance.now();
+  if (!res.ok) {
+    toast(`Vot respins: ${res.reason}`, 'bad');
+    return;
+  }
+  state.lastVote = {
+    voterId: v.id,
+    entry: res.entry,
+    ballot: enc.ballot,
+    plaintexts: enc.plaintexts,
+    verification: res.verification,
+    encMs: t1 - t0,
+    serverMs: t2 - t1,
+  };
+  state.myCodes.add(res.entry.trackingCode);
+  onBoardChanged();
+  toast(`Vot criptat și publicat pe board la poziția #${res.entry.index}.`, 'ok');
+}
+
+// ───────────── Pasul 4: bulletin board ─────────────
+function renderBoard() {
+  const list = entries();
+  $('#simulate-btn').disabled = !state.election;
+
+  const sim = state.sim;
+  $('#sim-progress').innerHTML = sim
+    ? `<div class="sim">
+        <div class="row"><b>${sim.finished ? 'Simulare încheiată' : `Alegătorul ${Math.min(sim.done + 1, sim.total)} din ${sim.total}…`}</b><span class="spacer"></span><span>${sim.done} / ${sim.total}</span></div>
+        <div class="progress"><i style="width:${(sim.done / sim.total) * 100}%"></i></div>
+        <div>${sim.text}</div>
+      </div>`
+    : '';
+
+  const matches = state.search ? (server.board?.find(state.search) ?? []) : [];
+  const matchSet = new Set(matches.map((e) => e.index));
+  let searchHtml = '';
+  if (state.search && C.normalizeCode(state.search).length < 4) {
+    searchHtml = notice('info', 'Introdu cel puțin 4 caractere din cod.');
+  } else if (state.search && matches.length) {
+    searchHtml = notice('ok', `<b>Găsit:</b> buletinul ${matches.map((e) => `#${e.index}`).join(', ')} este pe board, neschimbat față de codul tău de urmărire, la ora ${fmtTime(matches[0].time)}.`);
+  } else if (state.search) {
+    searchHtml = notice('bad', '<b>Niciun buletin cu acest cod.</b> Dacă ai votat și codul tău lipsește, buletinul a fost șters sau înlocuit.');
+  }
+  $('#search-result').innerHTML = searchHtml ? `<div style="margin-bottom:12px">${searchHtml}</div>` : '';
+
+  if (!state.election) {
+    $('#board-meta').innerHTML = '';
+    $('#board-table').innerHTML = '<div class="empty">Scrutinul nu este configurat. Generează cheile la pasul 1.</div>';
+    return;
+  }
+  $('#board-meta').innerHTML = `<span><b style="color:var(--ink)">${fmt(list.length)}</b> buletine</span>
+    <span>Capul lanțului (ultimul hash, publicat după fiecare buletin): ${chainHx(server.board.head)}</span>
+    <span>Click pe un rând pentru detalii.</span>`;
+  if (!list.length) {
+    $('#board-table').innerHTML = '<div class="empty">Board-ul este gol. Votează la pasul 3 sau simulează 20 de alegători.</div>';
+    return;
+  }
+  $('#board-table').innerHTML = `<div class="table-wrap"><table class="tbl">
+    <thead><tr><th>#</th><th>Cod de urmărire</th><th>Hash anterior</th><th></th><th>Hash intrare</th><th>Conținut</th><th>Ora</th></tr></thead>
+    <tbody>${[...list].reverse().map((e) => {
+      const cls = [
+        'clickable',
+        matchSet.has(e.index) ? 'match' : '',
+        state.flagged.has(e.index) ? 'flagged' : '',
+      ].join(' ');
+      const row = `<tr class="${cls}" data-action="toggleRow" data-index="${e.index}" data-sync="1" id="row-${e.index}">
+        <td class="idx">#${e.index}</td>
+        <td><span class="code">${fmtCode(e.trackingCode)}</span>
+          ${state.myCodes.has(e.trackingCode) ? ' <span class="badge info">votul tău</span>' : ''}
+          ${state.flagged.has(e.index) ? ` <span class="badge bad">${ICON.x} nu trece verificarea</span>` : ''}</td>
+        <td>${chainHx(e.prevHash)}</td>
+        <td class="link-arrow">→</td>
+        <td>${chainHx(e.entryHash)}</td>
+        <td class="muted small">${e.ballot.ciphertexts.length} × (α, β) + ${e.ballot.proofs.length + 1} dovezi ${state.expanded === e.index ? '▾' : '▸'}</td>
+        <td class="small">${fmtTime(e.time)}</td>
+      </tr>`;
+      if (state.expanded !== e.index) return row;
+      return row + `<tr class="detail"><td colspan="7">
+        <div class="ct-grid">${e.ballot.ciphertexts.map((ct, i) => `
+          <div class="ct" style="--cc:${COLORS[i]}">
+            <div class="ct-name">${esc(cands()[i])}</div>
+            <div class="kv"><span>α</span>${hx(ct.alpha)}</div>
+            <div class="kv"><span>β</span>${hx(ct.beta)}</div>
+            <div class="kv"><span>c₀ · c₁</span><span>${hx(e.ballot.proofs[i][0].c, 5, 3)} ${hx(e.ballot.proofs[i][1].c, 5, 3)}</span></div>
+          </div>`).join('')}
+        </div>
+        <div class="full-hash">cod de urmărire: ${e.trackingCode}<br>hash anterior: ${e.prevHash}<br>hash intrare = SHA-256(poziție, hash anterior, cod, oră): ${e.entryHash}</div>
+      </td></tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+}
+
+async function simulate() {
+  const total = 20;
+  const weights = [0.42, 0.35, 0.23];
+  state.sim = { done: 0, total, text: 'Se pregătesc alegătorii…', finished: false };
+  renderAll();
+  await yieldUI();
+  for (let i = 0; i < total; i++) {
+    const p = fakePerson();
+    const method = C.randomInt(2) ? 'nfc' : 'ocr';
+    const reg = await server.register(p.cnp, method);
+    if (!reg.ok) { i--; continue; }
+    let r = Math.random(), choice = 0;
+    while (choice < weights.length - 1 && r >= weights[choice]) r -= weights[choice++];
+    const enc = await C.encryptBallot(state.election, choice);
+    const res = await server.castBallot(reg.id, enc.ballot);
+    if (!res.ok) throw new Error(res.reason);
+    onBoardChanged();
+    state.sim.done = i + 1;
+    state.sim.text = `${esc(p.firstName)} ${esc(p.lastName.charAt(0))}. · înregistrat prin ${METHOD[method].short} · vot criptat · dovezi verificate de server ${ICON.check} · publicat la #${res.entry.index}`;
+    renderAll();
+    await yieldUI();
+  }
+  state.sim.finished = true;
+  state.sim.text = `${total} alegători fictivi s-au înregistrat și au votat. Voturile lor sunt pe board, dar nimeni nu știe ce conțin.`;
+}
+
+function findMine() {
+  const code = state.lastVote?.entry.trackingCode;
+  if (!code) return;
+  state.search = fmtCode(code);
+  $('#board-search').value = state.search;
+  goTo(4);
+  renderAll();
+  $(`#row-${state.lastVote.entry.index}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// ───────────── Pasul 5: numărare ─────────────
+function renderTally() {
+  const list = entries();
+  const t = state.tally;
+  $('#tally-notice').innerHTML = state.tallyNotice ? `<div style="margin-bottom:16px">${notice('warn', esc(state.tallyNotice))}</div>` : '';
+  $('#aggregate-btn').disabled = !state.election || !list.length;
+  $('#aggregate-btn').textContent = t ? `Recalculează agregatul (${list.length} buletine)` : `Calculează agregatul (${list.length} buletine)`;
+  $('#partial-all-btn').disabled = !t || t.partials.every(Boolean);
+
+  if (!state.election) {
+    $('#agg-out').innerHTML = '<div class="empty">Scrutinul nu este configurat (pasul 1).</div>';
+  } else if (!list.length) {
+    $('#agg-out').innerHTML = '<div class="empty">Nu există buletine. Votează sau simulează alegători (pasul 4).</div>';
+  } else if (!t) {
+    $('#agg-out').innerHTML = `<div class="empty">Apasă „Calculează agregatul”: se înmulțesc criptotextele celor ${list.length} buletine, candidat cu candidat.</div>`;
+  } else {
+    $('#agg-out').innerHTML = `<div class="table-wrap"><table class="tbl">
+      <thead><tr><th>Candidat</th><th class="math">A = Π α</th><th class="math">B = Π β</th><th>Conține</th></tr></thead>
+      <tbody>${t.aggregate.map((ct, i) => `<tr>
+        <td><span class="cand-tag" style="--cc:${COLORS[i]}">${esc(cands()[i])}</span></td>
+        <td>${hx(ct.alpha)}</td><td>${hx(ct.beta)}</td>
+        <td class="small muted">Enc(numărul de voturi), încă secret</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="muted small" style="margin:8px 0 0">Agregat calculat din ${t.ballots} buletine, în ${fmtMs(t.aggMs)}.</p>`;
+  }
+
+  if (!t) {
+    $('#dec-out').innerHTML = '<div class="empty">Decriptarea începe după calcularea agregatului.</div>';
+    $('#result-out').innerHTML = '<div class="empty">Rezultatul apare după ce toți cei trei trustees își aplică partea.</div>';
+    return;
+  }
+  const have = t.partials.filter(Boolean).length;
+  $('#dec-out').innerHTML = `
+    <div class="dec-grid">${state.election.trustees.map((tr, ti) => {
+      const p = t.partials[ti];
+      return `<div class="dec ${p ? 'done' : ''}">
+        <div class="trustee-head"><span class="t-avatar">T${ti + 1}</span><div><b>${esc(tr.name)}</b><small>${TRUSTEE_ROLES[ti]}</small></div></div>
+        ${p ? `${p.shares.map((sh, i) => `<div class="kv"><span class="cand-tag" style="--cc:${COLORS[i]}">d${'₁₂₃'[ti]} · ${esc(cands()[i].split(' ')[0])}</span>${hx(sh.d)}</div>`).join('')}
+            <div>${t.partialOk[ti] ? `<span class="badge ok">${ICON.check} dovadă Chaum–Pedersen validă</span>` : '<span class="badge bad">dovadă invalidă</span>'}</div>`
+          : `<button class="btn secondary" data-action="partial" data-t="${ti}">Decriptare parțială</button>
+             <span class="muted small">Folosește cheia secretă x${'₁₂₃'[ti]}, care nu părăsește trustee-ul.</span>`}
+      </div>`;
+    }).join('')}</div>
+    <div class="lockbar"><div class="locks">${t.partials.map((p) => `<i class="${p ? 'on' : ''}"></i>`).join('')}</div>
+      <span>${have === 3 ? '<b>3 din 3 părți</b>: rezultatul poate fi aflat.' : `<b>${have} din 3 părți</b>: rezultatul rămâne ascuns.`}</span></div>`;
+
+  if (!t.counts) {
+    $('#result-out').innerHTML = `<div class="empty">${have ? `Cu doar ${have} din 3 părți, β / (d…) nu este încă de forma gᵐ cu m mic: rezultatul nu poate fi aflat.` : 'Așteaptă decriptările parțiale.'}</div>`;
+    return;
+  }
+  const total = t.counts.reduce((s, n) => s + (n ?? 0), 0);
+  const max = Math.max(...t.counts.map((n) => n ?? 0));
+  const winners = t.counts.filter((n) => n === max).length;
+  $('#result-out').innerHTML = `
+    <div class="results">${t.counts.map((n, i) => `
+      <div class="result-row" style="--cc:${COLORS[i]}">
+        <div class="name">${esc(cands()[i])}${n === max && winners === 1 ? '<span class="winner">câștigător</span>' : ''}<small>${PARTIES[i]}</small></div>
+        <div class="bar"><i data-w="${total ? ((n ?? 0) / total) * 100 : 0}" ${t.animated ? `style="width:${total ? ((n ?? 0) / total) * 100 : 0}%"` : ''}></i></div>
+        <div class="num"><b>${n ?? '?'}</b><small>${total ? `${((100 * (n ?? 0)) / total).toLocaleString('ro-RO', { maximumFractionDigits: 1 })}%` : '—'}</small></div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:12px">${total === t.ballots
+      ? notice('ok', `<b>Total: ${total} voturi = ${t.ballots} buletine.</b> Fiecare total a fost găsit încercând g⁰, g¹, g², … până la potrivire (cel mult ${t.ballots} încercări). Niciun buletin individual nu a fost decriptat.`)
+      : notice('bad', `<b>Atenție: totalul voturilor (${total}) diferă de numărul de buletine (${t.ballots}).</b> Rulează verificarea publică.`)}</div>`;
+  if (!t.animated && state.step === 5) {
+    t.animated = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => $$('#result-out .bar > i').forEach((bar) => { bar.style.width = `${bar.dataset.w}%`; })));
+  } else {
+    $$('#result-out .bar > i').forEach((bar) => { bar.style.width = `${bar.dataset.w}%`; });
+  }
+}
+
+function aggregate() {
+  const list = entries();
+  const t0 = performance.now();
+  const agg = C.computeAggregate(state.election, list);
+  state.tally = {
+    ballots: list.length,
+    aggregate: agg,
+    aggMs: performance.now() - t0,
+    partials: state.election.trustees.map(() => null),
+    partialOk: state.election.trustees.map(() => false),
+    counts: null,
+  };
+  state.tallyNotice = '';
+  state.verify = null;
+  state.flagged = new Set();
+}
+
+async function partial(ti) {
+  const t = state.tally;
+  if (!t || t.partials[ti]) return;
+  const p = await C.partialDecrypt(state.election, state.trustees[ti], t.aggregate);
+  const v = await C.verifyPartialDecryption(state.election, state.election.trustees[ti], t.aggregate, p);
+  t.partials[ti] = p;
+  t.partialOk[ti] = v.ok;
+  if (t.partials.every(Boolean)) t.counts = C.combineDecryption(t.aggregate, t.partials, C.searchLimit(t));
+  state.verify = null;
+}
+
+async function partialAll() {
+  for (let i = 0; i < state.trustees.length; i++) {
+    if (state.tally.partials[i]) continue;
+    await partial(i);
+    renderAll();
+    await sleep(250);
+  }
+}
+
+// ───────────── Pasul 6: verificare publică ─────────────
+const CHECKS = [
+  { title: 'Cheile trustees și cheia scrutinului', desc: 'Fiecare trustee dovedește că își cunoaște cheia; cheia scrutinului trebuie să fie produsul cheilor publice.' },
+  { title: 'Lanțul de hash-uri al board-ului', desc: 'Se recalculează hash-ul fiecărui buletin și legătura cu intrarea anterioară.' },
+  { title: 'Dovezile zero-knowledge', desc: 'Fiecare criptotext e 0 sau 1 și fiecare buletin conține exact un vot.' },
+  { title: 'Agregatul homomorfic', desc: 'Se reînmulțesc criptotextele de pe board și se compară cu agregatul folosit la numărare.' },
+  { title: 'Decriptarea și rezultatul', desc: 'Se verifică dovezile celor trei decriptări parțiale și se recalculează rezultatul.' },
+];
+
+function renderVerify() {
+  $('#verify-btn').disabled = !state.election;
+  $('#verify-hint').textContent = !state.election
+    ? 'Configurează mai întâi scrutinul (pasul 1).'
+    : `${entries().length} buletine pe board · ${state.tally?.counts ? 'rezultat publicat' : 'numărarea nu este completă'}`;
+  const items = state.verify?.items ?? CHECKS.map((c) => ({ ...c, status: 'pending', detail: '', problems: [] }));
+  $('#checks').innerHTML = items.map((it, i) => `
+    <li class="check ${it.status}">
+      <div class="ic">${it.status === 'ok' ? ICON.check : it.status === 'fail' ? ICON.x : it.status === 'skip' ? '–' : it.status === 'running' ? '' : i + 1}</div>
+      <div>
+        <h4>${it.title}</h4>
+        <p>${it.desc}</p>
+        ${it.detail ? `<div class="detail">${it.detail}</div>` : ''}
+        ${it.problems.length ? `<ul class="problems">${it.problems.slice(0, 6).map((p) => `<li>${esc(p.text)}</li>`).join('')}${it.problems.length > 6 ? `<li>… și încă ${it.problems.length - 6}</li>` : ''}</ul>` : ''}
+      </div>
+    </li>`).join('');
+
+  const v = state.verify;
+  if (!v?.finished) {
+    $('#verdict').innerHTML = '';
+  } else if (v.ok) {
+    $('#verdict').innerHTML = notice('ok', `<b>Toate verificările au trecut.</b> ${state.tally?.counts ? 'Rezultatul publicat corespunde exact buletinelor de pe board.' : 'Buletinele sunt corecte; rulează din nou după numărare pentru a verifica și rezultatul.'}`);
+  } else {
+    const idx = [...state.flagged].sort((a, b) => a - b);
+    $('#verdict').innerHTML = notice('bad', `<b>Verificarea a eșuat.</b> ${idx.length ? `Problema este la ${idx.length === 1 ? 'buletinul' : 'buletinele'} ${idx.map((i) => `#${i}`).join(', ')}.` : ''} Datele publice nu corespund cu ce s-a anunțat.
+      ${idx.length ? '<div class="row" style="margin-top:8px"><button class="btn secondary small" data-action="showFlagged" data-sync="1">Arată pe board →</button></div>' : ''}`);
+  }
+}
+
+async function runVerification() {
+  const election = state.election;
+  if (!election) return;
+  const list = entries();
+  const tally = state.tally;
+  const items = CHECKS.map((c) => ({ ...c, status: 'pending', detail: '', problems: [] }));
+  state.verify = { items, finished: false, ok: null };
+  state.flagged = new Set();
+  renderAll();
+
+  const begin = async (i, detail = '') => {
+    Object.assign(items[i], { status: 'running', detail });
+    renderVerify();
+    applyBusy();
+    await sleep(300);
+  };
+  const finish = async (i, result, okDetail) => {
+    Object.assign(items[i], result.ok ? { status: 'ok', detail: okDetail } : { status: 'fail', detail: `${result.problems.length} ${result.problems.length === 1 ? 'problemă' : 'probleme'}:`, problems: result.problems });
+    for (const p of result.problems) if (p.index) state.flagged.add(p.index);
+    renderVerify();
+    applyBusy();
+    await sleep(250);
+  };
+  const progress = (i, label) => async (done, total) => {
+    items[i].detail = `${label} ${done} din ${total}…`;
+    renderVerify();
+    applyBusy();
+    await yieldUI();
+  };
+  const skip = (i, why) => Object.assign(items[i], { status: 'skip', detail: why });
+
+  await begin(0, 'Se verifică trei dovezi Schnorr…');
+  await finish(0, await C.verifyElectionKeys(election), `${election.trustees.length} dovezi Schnorr valide · h = h₁·h₂·h₃ ${ICON.check}`);
+
+  if (!list.length) {
+    skip(1, 'Board-ul este gol.');
+    skip(2, 'Board-ul este gol.');
+  } else {
+    await begin(1);
+    const chain = await C.verifyChain(election.id, list, { onProgress: progress(1, 'Intrarea') });
+    await finish(1, chain, `${list.length} intrări, toate legate corect · capul lanțului ${chainHx(chain.head)}`);
+    await begin(2);
+    const proofs = await C.verifyBallots(election, list, { onProgress: progress(2, 'Buletinul') });
+    await finish(2, proofs, `${list.length} buletine × ${election.candidates.length + 1} dovezi = ${proofs.proofs} dovezi valide`);
+  }
+
+  if (!tally) {
+    skip(3, 'Numărarea nu a fost făcută încă (pasul 5).');
+    skip(4, 'Numărarea nu a fost făcută încă (pasul 5).');
+  } else {
+    await begin(3);
+    await finish(3, C.verifyAggregate(election, list, tally), `Πα și Πβ recalculate pentru ${election.candidates.length} candidați = agregatul folosit la numărare`);
+    if (!tally.counts) {
+      skip(4, 'Decriptarea parțială nu este completă (pasul 5).');
+    } else {
+      await begin(4);
+      await finish(4, await C.verifyDecryption(election, tally), `${election.trustees.length * election.candidates.length} decriptări parțiale valide · rezultat: ${tally.counts.map((n, i) => `${esc(election.candidates[i])} ${n}`).join(', ')}`);
+    }
+  }
+  state.verify.finished = true;
+  state.verify.ok = items.every((it) => it.status !== 'fail');
+}
+
+function showFlagged() {
+  const first = Math.min(...state.flagged);
+  goTo(4);
+  renderAll();
+  $(`#row-${first}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// ───────────── Atacuri ─────────────
+const logHtml = (lines) => `<ul class="log">${lines.map((l) => `<li class="${l.type}"><span class="li-ic">${{ info: '•', pass: '→', blocked: '✓', breach: '!' }[l.type]}</span><div>${l.html}</div></li>`).join('')}</ul>`;
+
+function requireElection() {
+  if (state.election) return true;
+  toast('Generează mai întâi cheile (pasul 1).', 'bad');
+  return false;
+}
+
+async function atkDouble() {
+  if (!requireElection()) return;
+  const log = [];
+  state.atk.double = log;
+  const push = async (type, html) => { log.push({ type, html }); renderAttacks(); await sleep(350); };
+  const cv = state.currentVoter;
+  let voterId, cnp;
+  if (cv && server.voters.get(cv.id)?.voted) {
+    voterId = cv.id;
+    cnp = cv.cnp;
+    await push('info', `Folosim alegătorul curent, <b>${esc(cv.name)}</b> (HMAC ${hx(cv.id)}), care a votat deja.`);
+  } else {
+    const p = fakePerson();
+    const reg = await server.register(p.cnp, 'nfc');
+    voterId = reg.id;
+    cnp = p.cnp;
+    await push('info', `Alegător fictiv înregistrat: <b>${esc(p.fullName)}</b> (HMAC ${hx(reg.id)}).`);
+    const first = await C.encryptBallot(state.election, C.randomInt(cands().length));
+    const r1 = await server.castBallot(voterId, first.ballot);
+    onBoardChanged();
+    await push('pass', `Primul vot: <b>acceptat</b>, publicat pe board la poziția #${r1.entry.index}.`);
+  }
+  const second = await C.encryptBallot(state.election, C.randomInt(cands().length));
+  const r2 = await server.castBallot(voterId, second.ballot);
+  await push('blocked', `Al doilea vot (buletin nou, cu dovezi valide): <b>RESPINS</b>, ${esc(r2.reason)}.`);
+  const r3 = await server.register(cnp, 'ocr');
+  await push('blocked', `Re-înregistrare cu același CNP, pentru o identitate nouă: <b>RESPINSĂ</b>, ${esc(r3.reason)}.`);
+  await push('info', `Board-ul are în continuare ${entries().length} buletine: niciun vot în plus.`);
+}
+
+async function atkInvalid(variant) {
+  if (!requireElection()) return;
+  const k = cands().length;
+  const plain = Array(k).fill(0);
+  plain[0] = 2;
+  if (variant === 'sly') plain[1] = -1;
+  const p = fakePerson();
+  const reg = await server.register(p.cnp, 'ocr');
+  const forged = await C.encryptVector(state.election, plain);
+  const res = await server.castBallot(reg.id, forged.ballot);
+  state.atk.invalid = { variant, plain, res, name: p.fullName };
+}
+
+function renderInvalid() {
+  const a = state.atk.invalid;
+  if (!a) return '';
+  const v = a.res.verification;
+  if (!v) return notice('ok', `<b>Respins:</b> ${esc(a.res.reason)}.`);
+  const rows = cands().map((name, i) => `<tr>
+      <td><span class="cand-tag" style="--cc:${COLORS[i]}">${esc(name)}</span></td>
+      <td class="vec">${a.plain[i]}</td>
+      <td>${v.candidates[i].ok ? `<span class="badge ok">${ICON.check} trece</span>` : `<span class="badge bad">${ICON.x} pică</span> <span class="small muted">${esc(v.candidates[i].why)}</span>`}</td>
+    </tr>`).join('');
+  const sum = a.plain.reduce((s, x) => s + x, 0);
+  return `
+    <div class="muted small">Alegător fictiv nou (${esc(a.name)}), ca votul să nu fie respins pentru vot dublu. Vector criptat trimis: <span class="vec">[${a.plain.join(', ')}]</span></div>
+    <div class="table-wrap"><table class="tbl">
+      <thead><tr><th>Candidat</th><th>Valoare criptată</th><th>Dovada „0 sau 1”</th></tr></thead>
+      <tbody>${rows}
+        <tr><td><b>Suma</b></td><td class="vec">${sum}</td><td>${v.sum.ok ? `<span class="badge ok">${ICON.check} dovada „exact un vot” trece</span>` : `<span class="badge bad">${ICON.x} dovada „exact un vot” pică</span> <span class="small muted">${esc(v.sum.why)}</span>`}</td></tr>
+      </tbody></table></div>
+    ${notice('ok', `<b>Serverul a respins buletinul:</b> ${esc(a.res.reason)}. Nimic nu a ajuns pe board, iar alegătorul își păstrează dreptul de a vota corect.
+      ${a.variant === 'sly' ? '<br>Observă: dovada sumei trece (2 − 1 + 0 = 1), dar dovezile 0/1 pică. De aceea sunt necesare ambele tipuri de dovezi.' : ''}`)}`;
+}
+
+function atkTamper() {
+  if (!requireElection()) return;
+  const list = entries();
+  if (!list.length) {
+    toast('Board-ul este gol. Simulează alegători la pasul 4.', 'bad');
+    return;
+  }
+  if (state.tamper) return;
+  const entry = list[C.randomInt(list.length)];
+  const cand = C.randomInt(cands().length);
+  const before = entry.ballot.ciphertexts[cand].beta;
+  const restore = C.tamperAddVote(entry, cand);
+  state.tamper = { index: entry.index, cand, before, after: entry.ballot.ciphertexts[cand].beta, code: entry.trackingCode, restore, tallied: !!state.tally };
+  state.verify = null;
+  state.flagged = new Set();
+}
+
+function atkRestore() {
+  if (!state.tamper) return;
+  state.tamper.restore();
+  state.tamper = null;
+  state.verify = null;
+  state.flagged = new Set();
+  toast('Board-ul a fost restaurat.', 'ok');
+}
+
+async function atkTamperVerify() {
+  goTo(6);
+  await runVerification();
+}
+
+function renderTamper() {
+  const t = state.tamper;
+  $('#atk-tamper-btn').disabled = !!t || !entries().length;
+  $('#atk-tamper-verify').disabled = !state.election;
+  $('#atk-restore').disabled = !t;
+  if (!t) return '';
+  return logHtml([
+    { type: 'breach', html: `Atacatorul a modificat <b>buletinul #${t.index}</b> (cod ${fmtCode(t.code)}): β pentru <b>${esc(cands()[t.cand])}</b> a fost înmulțit cu g, adică <b>+1 vot</b> pentru acest candidat, fără să știe votul inițial.` },
+    { type: 'info', html: `β înainte: ${hx(t.before)} → după: ${hx(t.after)}` },
+    { type: 'info', html: `Nu a putut recalcula dovezile zero-knowledge (ar trebui să cunoască valorile aleatoare r ale alegătorului) și nici nu a recalculat hash-urile. ${t.tallied ? 'Numărarea fusese deja făcută pe board-ul corect.' : 'Dacă numărarea se face acum, rezultatul va include votul adăugat.'}` },
+    { type: 'pass', html: 'Rulează verificarea publică: va arăta exact buletinul și candidatul afectați. Chiar dacă atacatorul ar fi recalculat hash-urile, dovezile tot ar fi picat, iar un buletin înlocuit complet ar fi fost observat de alegător, care nu și-ar mai fi găsit codul.' },
+  ]);
+}
+
+function atkNewCnp() {
+  $('#atk-cnp').value = C.randomCnp();
+  state.atk.hash = null;
+  renderAttacks();
+}
+
+async function atkHash() {
+  const cnp = $('#atk-cnp').value.trim();
+  const info = C.validateCnp(cnp);
+  if (!info.ok) {
+    toast(`CNP invalid: ${info.why}`, 'bad');
+    return;
+  }
+  const space = C.cnpSearchSpace(info.birthDate);
+  const h = {
+    cnp,
+    info,
+    total: space.length,
+    sha: { stored: await C.sha256Hex(cnp), done: 0, result: null },
+    hmac: { stored: await server.fingerprint(cnp), done: 0, result: null },
+  };
+  state.atk.hash = h;
+  renderAttacks();
+  const onProgress = (side) => async (done) => { h[side].done = done; renderAttacks(); applyBusy(); await yieldUI(); };
+  h.sha.result = await C.dictionaryAttack(h.sha.stored, space, C.sha256Hex, { batchSize: 3000, onProgress: onProgress('sha') });
+  h.sha.done = h.sha.result.tried;
+  renderAttacks();
+  applyBusy();
+  // Atacatorul nu are cheia serverului: poate doar să ghicească una.
+  const guessedKey = await C.importHmacKey(C.randomBytes(32));
+  h.hmac.result = await C.dictionaryAttack(h.hmac.stored, space, (c) => C.hmacHex(guessedKey, c), { batchSize: 3000, onProgress: onProgress('hmac') });
+  h.hmac.done = h.hmac.result.tried;
+}
+
+function renderHashSpace() {
+  const cnp = $('#atk-cnp').value.trim();
+  const info = C.validateCnp(cnp);
+  if (!info.ok) return notice('warn', 'Introdu un CNP valid (13 cifre) sau generează unul fictiv.');
+  const n = C.cnpSearchSpace(info.birthDate).length;
+  return `<div class="space-eq">Data nașterii ${fmtDate(info.birthDate)} (cunoscută, de ex. de pe o rețea socială) ⇒
+    2 (sex) × 48 (județ) × 999 (nr. de ordine) = <b>${fmt(n)}</b> CNP-uri posibile.
+    <span class="muted">Cifra de control nu adaugă nimic: se calculează din celelalte 12.</span></div>`;
+}
+
+function renderHashAttack() {
+  const h = state.atk.hash;
+  if (!h) return '';
+  const col = (side) => {
+    const s = h[side];
+    const r = s.result;
+    const isSha = side === 'sha';
+    const cls = r ? (r.found ? 'lost' : 'safe') : '';
+    let outcome = '';
+    if (r && r.found) {
+      outcome = notice('bad', `<b>CNP recuperat: <span class="mono">${r.found}</span></b><br>după ${fmt(r.tried)} încercări, în ${fmtMs(r.ms)}.`);
+    } else if (r) {
+      outcome = notice('ok', `<b>Nicio potrivire</b> în toate cele ${fmt(r.total)} variante (${fmtMs(r.ms)}). Fără cheia serverului, atacatorul ar trebui să ghicească și cheia: 2<sup>256</sup> ≈ 1,2 · 10<sup>77</sup> posibilități.`);
+    }
+    return `<div class="hash-col ${cls}">
+      <h4>${isSha ? 'SHA-256(CNP) — fără cheie' : 'HMAC-SHA256(cheie secretă, CNP)'}</h4>
+      <div class="small muted">Valoarea din baza de date furată:</div>
+      <div>${hx(s.stored, 20, 8)}</div>
+      <div class="small muted">${isSha ? 'Atacatorul calculează SHA-256 pentru fiecare CNP posibil și compară.' : 'Atacatorul încearcă la fel, dar nu are cheia serverului, deci folosește o cheie ghicită.'}</div>
+      <div class="progress ${r ? (r.found ? 'bad' : 'ok') : ''}"><i style="width:${(s.done / h.total) * 100}%"></i></div>
+      <div class="small">${fmt(s.done)} / ${fmt(h.total)} încercări</div>
+      ${outcome}
+    </div>`;
+  };
+  return `<div class="hash-cols">${col('sha')}${col('hmac')}</div>
+    ${h.hmac.result ? `<div style="margin-top:12px">${notice('warn', 'Dacă cheia serverului ar fi furată odată cu baza de date, HMAC-ul ar putea fi spart la fel de ușor. De aceea cheia stă într-un modul hardware (HSM), separat de date, și nu poate fi exportată.')}</div>` : ''}`;
+}
+
+function renderAttacks() {
+  $('#atk-double-out').innerHTML = state.atk.double ? logHtml(state.atk.double) : '';
+  $('#atk-invalid-out').innerHTML = renderInvalid();
+  $('#atk-tamper-out').innerHTML = renderTamper();
+  $('#atk-hash-space').innerHTML = renderHashSpace();
+  $('#atk-hash-out').innerHTML = renderHashAttack();
+}
+
+// ───────────── Randare și evenimente ─────────────
+function renderAll() {
+  // Butoanele statice pornesc activate; fiecare randare le dezactivează după logica ei.
+  $$('button[data-action]').forEach((el) => { el.disabled = false; });
+  renderNav();
+  renderStatus();
+  renderSetup();
+  renderRegistration();
+  renderVote();
+  renderBoard();
+  renderTally();
+  renderVerify();
+  renderAttacks();
+  applyBusy();
+}
+
+const busyKey = (el) => el.dataset.action + (el.dataset.t ?? '');
+
+// Cât rulează o operație lungă, toate butoanele de acțiune sunt blocate (navigarea rămâne liberă).
+function applyBusy() {
+  $$('button[data-action]').forEach((el) => {
+    if (state.busy) el.disabled = true;
+    el.classList.toggle('is-busy', busyKey(el) === state.busy && el.classList.contains('btn'));
+  });
+}
+
+async function run(name, fn) {
+  if (state.busy) return;
+  state.busy = name;
+  renderAll();
+  try {
+    await fn();
+  } catch (err) {
+    console.error(err);
+    toast(`Eroare: ${err.message}`, 'bad');
+  } finally {
+    state.busy = null;
+    renderAll();
+  }
+}
+
+const actions = {
+  keygen,
+  resetElection,
+  scanOcr: () => scan('ocr'),
+  scanNfc: () => scan('nfc'),
+  register,
+  choose: (el) => { state.choice = Number(el.dataset.i); },
+  cast,
+  copyCode: async () => {
+    try {
+      await navigator.clipboard.writeText(state.lastVote.entry.trackingCode);
+      toast('Codul de urmărire a fost copiat.', 'ok');
+    } catch {
+      toast('Copierea nu este permisă în acest browser.', 'bad');
+    }
+  },
+  findMine,
+  toggleRow: (el) => {
+    const i = Number(el.dataset.index);
+    state.expanded = state.expanded === i ? null : i;
+  },
+  simulate,
+  aggregate,
+  partial: (el) => partial(Number(el.dataset.t)),
+  partialAll,
+  verify: runVerification,
+  showFlagged,
+  atkDouble,
+  atkInvalid: () => atkInvalid('plain'),
+  atkInvalidSly: () => atkInvalid('sly'),
+  atkTamper,
+  atkTamperVerify,
+  atkRestore,
+  atkNewCnp,
+  atkHash,
+};
+
+document.addEventListener('click', (e) => {
+  const go = e.target.closest('[data-goto]');
+  if (go) {
+    goTo(Number(go.dataset.goto));
+    renderAll();
+    return;
+  }
+  const el = e.target.closest('[data-action]');
+  if (!el || el.disabled) return;
+  const fn = actions[el.dataset.action];
+  if (!fn) return;
+  if (el.dataset.sync) {
+    if (state.busy) return;
+    Promise.resolve(fn(el)).then(renderAll);
+    return;
+  }
+  run(busyKey(el), () => fn(el));
+});
+
+let previewTimer;
+$('#f-cnp').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 13);
+  state.regResult = null;
+  renderRegistration();
+  applyBusy();
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(updateHmacPreview, 120);
+});
+$('#board-search').addEventListener('input', (e) => {
+  state.search = e.target.value.trim();
+  renderBoard();
+  applyBusy();
+});
+$('#atk-cnp').addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 13);
+  state.atk.hash = null;
+  renderAttacks();
+  applyBusy();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest('input, textarea') || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'ArrowRight') { goTo(state.step + 1); renderAll(); }
+  if (e.key === 'ArrowLeft') { goTo(state.step - 1); renderAll(); }
+});
+
+// ───────────── Pornire ─────────────
+$('#p-hex').textContent = `${C.P.toString(16).slice(0, 12)}…${C.P.toString(16).slice(-8)}`;
+$('#p-hex').title = C.P.toString(16);
+$('#atk-cnp').value = C.randomCnp();
+goTo(1);
+renderAll();
+window.__machetaReady = true;
+</script>
+</body>
+</html>
