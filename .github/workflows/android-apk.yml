@@ -1,0 +1,85 @@
+name: Android APK
+
+# Construiește aplicația mobilă (cu modulele native NFC și OCR) pe serverele GitHub,
+# care au Android SDK, și pune APK-ul în folderul apk/ din branch și ca artifact.
+#
+# Fără EXPO_PUBLIC_API_URL, aplicația folosește backend-ul simulat inclus (date de test).
+# Pentru un server real: Actions → Android APK → Run workflow → api_url.
+
+on:
+  push:
+    branches: [claude/laughing-euler-1mgtap, master, main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'URL-ul backend-ului (gol = backend simulat)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_API_URL: ${{ github.event.inputs.api_url }}
+      GRADLE_OPTS: -Xmx4g -Dorg.gradle.jvmargs=-Xmx4g
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Pachetele comune (crypto, api)
+        run: npm ci && npm run build:packages
+
+      - name: Dependențele aplicației mobile
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Proiectul Android (expo prebuild)
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build APK (release, arm64)
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --stacktrace
+
+      - name: Copiază APK-ul în apk/
+        run: |
+          mkdir -p apk
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk apk/vot-verificabil.apk
+          ls -la apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vot-verificabil-apk
+          path: apk/vot-verificabil.apk
+
+      - name: Salvează APK-ul în branch
+        if: github.ref_type == 'branch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk/vot-verificabil.apk
+          git commit -m "APK construit din ${GITHUB_SHA::7} [skip ci]" || exit 0
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
