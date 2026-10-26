@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
-import { Link, useParams } from 'react-router'
-import { api, mockTools, type Election, type EligibleImportResult } from '../api'
+import { Link, useLocation, useParams } from 'react-router'
+import { api, apiMode, mockTools, type Election, type EligibleImportResult, type TrusteeToken } from '../api'
 import { ErrorBox, Hash, Loading, Stat, StatusBadge } from '../components/ui'
 import { formatInterval, percent } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
@@ -8,6 +8,8 @@ import { useAsync } from '../lib/useAsync'
 export function CommissionElection() {
   const { id = '' } = useParams()
   const election = useAsync(() => api.getElection(id), [id])
+  const location = useLocation()
+  const trusteeTokens = (location.state as { trusteeTokens?: TrusteeToken[] } | null)?.trusteeTokens
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ kind: 'ok' | 'bad'; text: string }>()
 
@@ -77,6 +79,8 @@ export function CommissionElection() {
 
       <Steps election={e} />
 
+      {trusteeTokens && e.status === 'draft' && <TrusteeTokens election={e} tokens={trusteeTokens} />}
+
       <div className="stats">
         <Stat label="Eligibili" value={e.stats.eligible} />
         <Stat label="Înregistrați" value={e.stats.registered} hint={percent(e.stats.registered, e.stats.eligible)} />
@@ -125,6 +129,10 @@ export function CommissionElection() {
       </div>
 
       {e.status === 'draft' && <EligibleImport election={e} onImported={election.reload} />}
+
+      {e.status !== 'draft' && <BoardHead election={e} />}
+
+      <AuditLog election={e} />
 
       {mockTools && (
         <div className="card card-dev">
@@ -215,7 +223,7 @@ function EligibleImport({ election, onImported }: { election: Election; onImport
         CSV cu un CNP pe linie. Serverul păstrează doar HMAC(CNP) și aruncă imediat valorile în clar. Acum sunt {election.stats.eligible}{' '}
         eligibili.
       </p>
-      <textarea className="input mono" rows={5} value={csv} onChange={(ev) => setCsv(ev.target.value)} placeholder={'cnp\n5040312170011\n...'} spellCheck={false} />
+      <textarea className="input mono" rows={5} value={csv} onChange={(ev) => setCsv(ev.target.value)} placeholder={'cnp\n5040312170018\n...'} spellCheck={false} />
       <div className="row gap-s mt-s">
         <label className="btn">
           Alege fișier CSV
@@ -233,6 +241,89 @@ function EligibleImport({ election, onImported }: { election: Election; onImport
             {result.invalid.length > 0 && ` (liniile ${result.invalid.slice(0, 8).map((x) => x.line).join(', ')}${result.invalid.length > 8 ? '…' : ''})`}
           </span>
         </div>
+      )}
+    </div>
+  )
+}
+
+function TrusteeTokens({ election, tokens }: { election: Election; tokens: TrusteeToken[] }) {
+  const base = apiMode.kind === 'http' ? apiMode.url : 'http://localhost:3000'
+  return (
+    <div className="card card-warn">
+      <h3>Token-urile trustees: afișate o singură dată</h3>
+      <p className="hint">
+        Serverul păstrează doar hash-ul lor. Trimite fiecărui trustee comanda lui, pe un canal separat. Trustee-ul își generează cheia
+        local; cheia secretă nu ajunge niciodată pe server.
+        {apiMode.kind === 'mock' && ' Cu backend-ul simulat, folosește „Simulează cheile trustees” de mai jos.'}
+      </p>
+      {tokens.map((t) => (
+        <div key={t.trusteeId} className="cmd">
+          <strong>{t.name}</strong>
+          <code className="mono">
+            npx evoting-trustee keygen --api {base} --election {election.id} --trustee {t.trusteeId} --token {t.token}
+          </code>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Hash-ul ultimei intrări, de publicat periodic într-un loc independent (de exemplu pe site-ul facultății). */
+function BoardHead({ election }: { election: Election }) {
+  const head = useAsync(() => api.getBoardHead(election.id), [election.id, election.stats.ballots])
+  if (!head.data) return null
+  return (
+    <div className="card">
+      <h3>Hash-ul board-ului de publicat independent</h3>
+      <p className="hint">
+        Publică periodic această valoare pe site-ul facultății sau într-un anunț semnat. Dacă serverul ar rescrie ulterior istoria board-ului,
+        verificatorul ar observa nepotrivirea cu valoarea publicată.
+      </p>
+      <div className="kv">
+        <span>Intrarea #{head.data.seq}</span>
+        <code className="mono wrap">{head.data.seq}:{head.data.hash}</code>
+      </div>
+    </div>
+  )
+}
+
+const ACTIONS: Record<string, string> = {
+  'election.create': 'Scrutin creat',
+  'eligible.import': 'Listă de eligibili importată',
+  'trustee.key': 'Cheie de trustee primită',
+  'election.public_key': 'Cheia scrutinului publicată',
+  'election.open': 'Vot deschis',
+  'voter.register': 'Alegător înregistrat',
+  'election.close': 'Vot închis, agregat publicat',
+  'tally.partial': 'Decriptare parțială primită',
+  'tally.result': 'Rezultat publicat',
+}
+
+function AuditLog({ election }: { election: Election }) {
+  const [open, setOpen] = useState(false)
+  const log = useAsync(() => (open ? api.getAuditLog(election.id) : Promise.resolve([])), [election.id, open, election.status, election.stats.registered])
+  const rows = (log.data ?? []).filter((x) => x.action !== 'voter.register')
+  const registrations = (log.data ?? []).length - rows.length
+  return (
+    <div className="card">
+      <div className="row space-between">
+        <h3>Jurnal de audit</h3>
+        <button type="button" className="btn btn-small" onClick={() => setOpen(!open)}>
+          {open ? 'Ascunde' : 'Arată'}
+        </button>
+      </div>
+      {open && log.error && <ErrorBox error={log.error} />}
+      {open && log.data && (
+        <ul className="list-plain audit">
+          {rows.map((x) => (
+            <li key={x.id}>
+              <span className="muted small nowrap">{new Date(x.createdAt).toLocaleString('ro-RO')}</span>
+              <span>{ACTIONS[x.action] ?? x.action}</span>
+              <span className="muted small">{x.actor}</span>
+            </li>
+          ))}
+          {registrations > 0 && <li className="muted small">+ {registrations} înregistrări de alegători (fără date personale)</li>}
+        </ul>
       )}
     </div>
   )

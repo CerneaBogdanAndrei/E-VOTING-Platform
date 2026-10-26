@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "@evoting/web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.4.0"

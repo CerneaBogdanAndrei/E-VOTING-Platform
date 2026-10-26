@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
-import { api } from '../api'
+import { api, apiMode } from '../api'
+import { logoutAdmin } from '../api/admin'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { formatInterval } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
@@ -14,9 +15,16 @@ export function Commission() {
           <h1>Panoul comisiei</h1>
           <p className="lead">Creează scrutine, importă lista eligibililor și deschide sau închide votul.</p>
         </div>
-        <Link to="/comisie/nou" className="btn btn-primary">
-          Scrutin nou
-        </Link>
+        <div className="row gap-s">
+          {apiMode.kind === 'http' && (
+            <button type="button" className="btn" onClick={logoutAdmin}>
+              Ieșire
+            </button>
+          )}
+          <Link to="/comisie/nou" className="btn btn-primary">
+            Scrutin nou
+          </Link>
+        </div>
       </div>
 
       {loading && !data && <Loading />}

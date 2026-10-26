@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { api, ApiError, type BoardEntry, type Election } from '../api'
+import { auditBallot, checkOwnEntry, verifyElection, STEP_TITLES, type StepId, type VerificationReport } from '@evoting/crypto'
+import { api, apiMode, ApiError, type BoardEntry, type Election } from '../api'
 import { ErrorBox, Hash, Loading, Stat, StatusBadge } from '../components/ui'
 import { formatDateTime, formatInterval, percent } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
-type Tab = 'board' | 'rezultat' | 'parametri'
+type Tab = 'board' | 'rezultat' | 'verificare' | 'benaloh' | 'parametri'
 
 export function ElectionPublic() {
   const { id = '' } = useParams()
@@ -46,6 +47,8 @@ export function ElectionPublic() {
           [
             ['board', 'Bulletin board'],
             ['rezultat', 'Rezultat'],
+            ['verificare', 'Verificare publică'],
+            ['benaloh', 'Audit buletin'],
             ['parametri', 'Parametri publici'],
           ] as const
         ).map(([key, label]) => (
@@ -57,6 +60,8 @@ export function ElectionPublic() {
 
       {tab === 'board' && <Board election={e} />}
       {tab === 'rezultat' && <Result election={e} />}
+      {tab === 'verificare' && <Verification election={e} />}
+      {tab === 'benaloh' && <BenalohAudit election={e} />}
       {tab === 'parametri' && <Parameters election={e} />}
     </>
   )
@@ -98,8 +103,10 @@ function Board({ election }: { election: Election }) {
         </button>
       </form>
       {lookup.entry && (
-        <div role="alert" className="alert alert-ok">
-          Buletinul #{lookup.entry.seq} e pe board, nemodificat, primit la {formatDateTime(lookup.entry.receivedAt)}.
+        <div role="alert" className={`alert ${checkOwnEntry(election.id, lookup.entry, { trackingCode: code }).ok ? 'alert-ok' : 'alert-bad'}`}>
+          {checkOwnEntry(election.id, lookup.entry, { trackingCode: code }).ok
+            ? `Buletinul #${lookup.entry.seq} e pe board, primit la ${formatDateTime(lookup.entry.receivedAt)}. Hash-ul recalculat în browser corespunde codului.`
+            : 'Intrarea găsită nu corespunde codului: conținutul a fost modificat. Raportează comisiei.'}
         </div>
       )}
       {lookup.error && <div role="alert" className="alert alert-bad">{lookup.error}</div>}
@@ -223,6 +230,159 @@ function Parameters({ election }: { election: Election }) {
           ))}
         </ul>
       </div>
+    </section>
+  )
+}
+
+function Verification({ election }: { election: Election }) {
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState<{ step: StepId; done: number; total: number }>()
+  const [report, setReport] = useState<VerificationReport>()
+  const [error, setError] = useState<string>()
+  const [head, setHead] = useState('')
+  const [elapsed, setElapsed] = useState(0)
+
+  const run = async () => {
+    setRunning(true)
+    setReport(undefined)
+    setError(undefined)
+    const t = performance.now()
+    try {
+      const b = await api.getAuditBundle(election.id)
+      const m = /^(\d+):([0-9a-fA-F]{64})$/.exec(head.trim())
+      if (head.trim() && !m) throw new Error('Hash-ul publicat se scrie ca SEQ:HASH')
+      const r = await verifyElection(
+        { election: b.election, registrations: b.registrations, board: b.board, tally: b.tally, result: b.result },
+        {
+          publishedHead: m ? { seq: Number(m[1]), hash: m[2] } : undefined,
+          onProgress: (step, done, total) => setProgress({ step, done, total }),
+          yieldEvery: 4,
+        },
+      )
+      setReport(r)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setElapsed(performance.now() - t)
+      setRunning(false)
+      setProgress(undefined)
+    }
+  }
+
+  const download = async () => {
+    const b = await api.getAuditBundle(election.id)
+    const url = URL.createObjectURL(new Blob([JSON.stringify(b)], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${election.id}-audit.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <section className="section">
+      <p className="hint">
+        Verificatorul rulează în browserul tău, cu aceeași bibliotecă folosită de server și de aplicație. Descarcă board-ul și reface fiecare
+        pas: cheile, lanțul de hash-uri, semnăturile, dovezile zero-knowledge, agregatul și decriptarea. Nu ai nevoie de niciun drept special.
+      </p>
+      <div className="search">
+        <input
+          className="input mono"
+          placeholder="Opțional: hash publicat independent, ca SEQ:HASH"
+          value={head}
+          onChange={(ev) => setHead(ev.target.value)}
+          spellCheck={false}
+        />
+        <button type="button" className="btn btn-primary" onClick={run} disabled={running}>
+          {running ? 'Se verifică…' : 'Verifică tot'}
+        </button>
+        <button type="button" className="btn" onClick={download}>
+          Descarcă JSON
+        </button>
+      </div>
+      {progress && (
+        <div className="progress">
+          <div className="progress-label">
+            {STEP_TITLES[progress.step]}: {progress.done}/{progress.total}
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${(progress.done / Math.max(1, progress.total)) * 100}%` }} />
+          </div>
+        </div>
+      )}
+      {error && <div role="alert" className="alert alert-bad">{error}</div>}
+      {report && (
+        <>
+          <div role="alert" className={`alert ${report.ok ? 'alert-ok' : 'alert-bad'}`}>
+            {report.ok
+              ? `Toate verificările trec (${report.ballots} buletine, ${(elapsed / 1000).toFixed(1)} s).`
+              : 'Verificarea a picat: rezultatul nu este de încredere. Detaliile arată exact unde.'}
+          </div>
+          <ol className="report">
+            {report.steps.map((st) => (
+              <li key={st.id} className={`report-step report-${st.status}`}>
+                <span className="report-icon">{st.status === 'ok' ? '✓' : st.status === 'fail' ? '✗' : '–'}</span>
+                <div>
+                  <strong>{st.title}</strong>
+                  {st.details.map((d) => (
+                    <div key={d} className="muted small">
+                      {d}
+                    </div>
+                  ))}
+                  {st.failures.map((f, i) => (
+                    <div key={i} className="report-failure small">
+                      <strong>{f.where}:</strong> {f.message}
+                    </div>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="hint mono wrap">Ultimul hash: {report.head}</p>
+        </>
+      )}
+      {apiMode.kind === 'http' && (
+        <p className="hint">
+          Din linia de comandă: <code className="mono">npx evoting-verify --api {apiMode.url} --election {election.id}</code>
+        </p>
+      )}
+    </section>
+  )
+}
+
+function BenalohAudit({ election }: { election: Election }) {
+  const [text, setText] = useState('')
+  const [outcome, setOutcome] = useState<{ ok: boolean; text: string }>()
+
+  const check = () => {
+    try {
+      if (!election.publicKey) throw new Error('Scrutinul nu are încă o cheie publică')
+      const data = JSON.parse(text)
+      if (data.electionId && data.electionId !== election.id) throw new Error('Fișierul de audit aparține altui scrutin')
+      const r = auditBallot({ electionId: election.id, publicKey: election.publicKey, candidateCount: election.candidates.length }, data.ciphertexts, data.secrets)
+      if (r.ok) {
+        const c = election.candidates.find((x) => x.position === r.choice)
+        setOutcome({ ok: true, text: `Buletinul criptează exact opțiunea declarată: ${c?.name ?? r.choice}. Aplicația a criptat corect.` })
+      } else setOutcome({ ok: false, text: `${r.reason}. Aplicația NU a criptat opțiunea aleasă: raportează comisiei.` })
+    } catch (err) {
+      setOutcome({ ok: false, text: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  return (
+    <section className="section">
+      <p className="hint">
+        Provocarea Benaloh: înainte de trimitere, aplicația poate dezvălui numerele aleatoare r ale unui buletin. Lipește aici datele de audit
+        exportate din aplicație; browserul recriptează opțiunea declarată și compară. Un buletin auditat nu se mai trimite: aplicația îl
+        recriptează cu r noi, deci secretul votului rămâne.
+      </p>
+      <textarea className="input mono" rows={8} value={text} onChange={(ev) => setText(ev.target.value)} placeholder='{"electionId": "...", "ciphertexts": [...], "secrets": {"choice": 1, "randomness": [...]}}' spellCheck={false} />
+      <div className="row gap-s mt-s">
+        <button type="button" className="btn btn-primary" onClick={check} disabled={!text.trim()}>
+          Verifică buletinul auditat
+        </button>
+      </div>
+      {outcome && <div role="alert" className={`alert mt-s ${outcome.ok ? 'alert-ok' : 'alert-bad'}`}>{outcome.text}</div>}
     </section>
   )
 }

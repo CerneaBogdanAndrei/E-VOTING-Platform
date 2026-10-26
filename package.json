@@ -8,13 +8,14 @@
     "packages/crypto",
     "packages/api",
     "apps/backend",
+    "apps/web",
     "tools/trustee",
     "tools/verifier",
     "tools/simulator",
     "demos/attacks"
   ],
   "scripts": {
-    "build": "npm run build:packages && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier -w @evoting/simulator -w @evoting/attacks && npm run build -w web",
+    "build": "npm run build:packages && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier -w @evoting/simulator -w @evoting/attacks && npm run build -w @evoting/web",
     "build:packages": "npm run build -w @evoting/crypto -w @evoting/api",
     "test": "npm run build:packages && npm test -w @evoting/crypto -w @evoting/api && npm test -w @evoting/backend",
     "typecheck": "npm run typecheck --workspaces --if-present"

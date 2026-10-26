@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router'
 import { apiMode } from '../api'
-import { CRYPTO_READY } from '../api/ballot'
 
 export function Layout() {
   return (
@@ -21,10 +20,11 @@ export function Layout() {
               Scrutine
             </NavLink>
             <NavLink to="/comisie">Comisie</NavLink>
+            <NavLink to="/despre">Cum funcționează</NavLink>
           </nav>
           <div className="mode" title={apiMode.kind === 'http' ? apiMode.url : 'Datele se pierd la reîncărcarea paginii'}>
             {apiMode.kind === 'mock' ? 'Backend simulat' : `API: ${apiMode.url}`}
-            {!CRYPTO_READY && <span className="mode-sep">· criptare: placeholder</span>}
+            <span className="mode-sep">· ElGamal pe ristretto255</span>
           </div>
         </div>
       </header>

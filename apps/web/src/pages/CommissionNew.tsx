@@ -61,7 +61,8 @@ export function CommissionNew() {
         candidates: candidates.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), description: c.description.trim() })),
         trustees: trustees.filter((t) => t.name.trim()).map((t) => ({ name: t.name.trim() })),
       })
-      navigate(`/comisie/${created.id}`)
+      // token-urile trustees se afișează o singură dată, pe pagina scrutinului
+      navigate(`/comisie/${created.election.id}`, { state: { trusteeTokens: created.trusteeTokens } })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setBusy(false)

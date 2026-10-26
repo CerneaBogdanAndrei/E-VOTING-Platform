@@ -677,3 +677,111 @@ textarea.input {
     grid-row: 2;
   }
 }
+
+/* ───────────── adăugiri: comisie, verificare publică ───────────── */
+.space-between {
+  justify-content: space-between;
+}
+.wrap {
+  word-break: break-all;
+}
+.card-warn {
+  border-color: #e9c46a;
+  background: #fffaf0;
+}
+.cmd {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+.cmd code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0e1726;
+  color: #c7d4f5;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+.audit li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eef0f4;
+}
+.login {
+  max-width: 440px;
+  margin: 40px auto;
+}
+.progress {
+  margin: 12px 0;
+}
+.progress-label {
+  font-size: 13px;
+  color: #5b6475;
+  margin-bottom: 4px;
+}
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #3b63e0;
+  transition: width 0.2s;
+}
+.report {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+.report-step {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e3e6ec;
+  border-radius: 8px;
+  background: #fff;
+}
+.report-icon {
+  font-weight: 700;
+  width: 18px;
+}
+.report-ok .report-icon {
+  color: #0b8a5b;
+}
+.report-fail {
+  border-color: #f0b4b4;
+  background: #fff6f6;
+}
+.report-fail .report-icon,
+.report-failure {
+  color: #b42318;
+}
+.report-skipped .report-icon {
+  color: #b7791f;
+}
+.prose {
+  max-width: 760px;
+  line-height: 1.6;
+}
+.prose h2 {
+  margin-top: 28px;
+}
+.prose code {
+  font-size: 0.92em;
+}
+.formula {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f5f7fb;
+  border: 1px solid #e3e6ec;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: block;
+  margin: 8px 0;
+}

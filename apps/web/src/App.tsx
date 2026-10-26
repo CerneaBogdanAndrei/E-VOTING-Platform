@@ -1,5 +1,7 @@
 import { Link, Route, Routes } from 'react-router'
+import { AdminGate } from './components/AdminGate'
 import { Layout } from './components/Layout'
+import { About } from './pages/About'
 import { Commission } from './pages/Commission'
 import { CommissionElection } from './pages/CommissionElection'
 import { CommissionNew } from './pages/CommissionNew'
@@ -12,9 +14,10 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="scrutin/:id" element={<ElectionPublic />} />
-        <Route path="comisie" element={<Commission />} />
-        <Route path="comisie/nou" element={<CommissionNew />} />
-        <Route path="comisie/:id" element={<CommissionElection />} />
+        <Route path="comisie" element={<AdminGate><Commission /></AdminGate>} />
+        <Route path="comisie/nou" element={<AdminGate><CommissionNew /></AdminGate>} />
+        <Route path="comisie/:id" element={<AdminGate><CommissionElection /></AdminGate>} />
+        <Route path="despre" element={<About />} />
         <Route
           path="*"
           element={
