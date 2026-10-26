@@ -38,7 +38,8 @@
           "cameraPermission": "Camera citește zona MRZ a buletinului. Imaginea se procesează doar pe telefon.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "./plugins/with-packaging-excludes"
     ],
     "scheme": "evote",
     "experiments": {
