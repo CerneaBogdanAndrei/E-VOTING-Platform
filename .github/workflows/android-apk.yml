@@ -79,7 +79,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # expo prebuild modifică fișiere versionate (ex. scripturile din package.json): se anulează,
+          # iar APK-ul se adaugă peste ultima versiune a branch-ului
+          cp apk/vot-verificabil.apk "$RUNNER_TEMP/vot-verificabil.apk"
+          git checkout -- .
+          git pull --ff-only origin "${GITHUB_REF_NAME}"
+          mkdir -p apk
+          cp "$RUNNER_TEMP/vot-verificabil.apk" apk/vot-verificabil.apk
           git add apk/vot-verificabil.apk
           git commit -m "APK construit din ${GITHUB_SHA::7} [skip ci]" || exit 0
-          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
