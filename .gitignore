@@ -1,11 +1,15 @@
-/tmp
-/out-tsc
+node_modules/
+dist/
+dist-test/
+*.tsbuildinfo
+.env
+.env.local
+*.log
+.DS_Store
 
-/node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-/.pnp
-.pnp.js
-
+# IDE
+.idea/
 .vscode/*
+
+# cheile secrete ale trustees (generate de CLI)
+*.trustee-key.json
