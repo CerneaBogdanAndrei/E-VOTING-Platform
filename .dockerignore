@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/dist-test
+**/.env
+**/.env.local
+apps/backend/pki
+apps/mobile
+demos/macheta
+.git
+.idea
+*.trustee-key.json

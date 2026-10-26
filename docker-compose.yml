@@ -1,0 +1,60 @@
+# Pornirea întregului sistem pentru demo: docker compose up --build
+# Apoi: web pe http://localhost:8080, API pe http://localhost:3000.
+# Secretele vin din fișierul .env de lângă acest fișier (vezi .env.example).
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: evoting
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evoting}
+      POSTGRES_DB: evoting
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evoting -d evoting"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://evoting:${POSTGRES_PASSWORD:-evoting}@db:5432/evoting
+      CNP_HMAC_KEY: ${CNP_HMAC_KEY:?setează CNP_HMAC_KEY în .env (openssl rand -hex 32)}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?setează ADMIN_TOKEN în .env}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      CSCA_DIR: /pki/csca
+      PKI_DIR: /pki
+      GENERATE_TEST_PKI: ${GENERATE_TEST_PKI:-true}
+      RATE_LIMIT: ${RATE_LIMIT:-on}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    volumes:
+      - pki:/pki
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  pki:

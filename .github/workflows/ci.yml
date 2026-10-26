@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Teste (criptografie, API, backend pe PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: evoting
+          POSTGRES_PASSWORD: evoting
+          POSTGRES_DB: evoting_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U evoting -d evoting_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://evoting:evoting@localhost:5432/evoting_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  mobile:
+    name: Aplicația mobilă (tipuri și bundle Android)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm run build:packages
+      - run: npm ci
+        working-directory: apps/mobile
+      - run: npx tsc --noEmit
+        working-directory: apps/mobile
+      - run: npx expo export --platform android --output-dir /tmp/export
+        working-directory: apps/mobile
+        env:
+          EXPO_OFFLINE: '1'
+          CI: '1'
