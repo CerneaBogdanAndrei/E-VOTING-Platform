@@ -572,17 +572,18 @@ Toate măsurătorile sunt pe un singur calculator, unde clientul, serverul și P
 
 | Metrică | 100 de alegători | 1.000 de alegători | 10.000 de alegători |
 | --- | --- | --- | --- |
-| Criptare + dovezi per buletin (client, Node) | 20,8 ms | 19,2 ms | __C10K__ |
-| Trimitere + validare (dus-întors, sub încărcare) | 218 ms | 209 ms | __S10K__ |
-| Buletine pe secundă | 17,4 | 19,5 | __B10K__ |
-| Închidere (calculul agregatului) | 115 ms | 718 ms | __A10K__ |
-| Decriptare parțială per trustee | 16 ms | 13 ms | __D10K__ |
-| Verificare publică completă | 2,5 s | 25,8 s | __V10K__ |
-| Verificare per buletin | 24,9 ms | 25,8 ms | __P10K__ |
-| Rezultat = voturile simulate | da | da | __R10K__ |
+| Criptare + dovezi per buletin (client, Node) | 20,8 ms | 19,2 ms | 19,5 ms |
+| Trimitere + validare (dus-întors, sub încărcare) | 218 ms | 209 ms | 230 ms |
+| Buletine pe secundă | 17,4 | 19,5 | 19,0 |
+| Închidere (calculul agregatului) | 115 ms | 718 ms | 7,8 s |
+| Decriptare parțială per trustee | 16 ms | 13 ms | 13 ms |
+| Verificare publică completă | 2,5 s | 25,8 s | 239 s (4 min) |
+| Verificare per buletin | 24,9 ms | 25,8 ms | 23,9 ms |
+| Rezultat = voturile simulate | da | da | da |
 
 **Interpretare:**
 
+- Verificarea publică și închiderea cresc liniar cu numărul de buletine: ~24 ms per buletin la verificare, iar agregatul pentru 10.000 de buletine (30.000 de criptotexte decodate și adunate) se calculează în 7,8 s. Decriptarea parțială nu depinde de numărul de buletine (~13 ms per trustee), pentru că se aplică doar celor 3 criptotexte agregate.
 - Validarea unui buletin pe server (semnătură + dovezi) durează ~25 ms de CPU. Un singur proces Node validează deci ~40 de buletine pe secundă. Pentru alegerile unei facultăți e suficient: 10.000 de voturi într-o zi înseamnă sub 0,2 voturi pe secundă în medie.
 - Timpul de criptare de pe un telefon Android real e o metrică din plan care rămâne de măsurat pe dispozitiv. În browser, pe build-ul web al aplicației, criptarea a durat ~9 ms.
 
