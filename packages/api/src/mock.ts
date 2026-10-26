@@ -13,6 +13,7 @@ import {
   computeAggregate,
   generateCredential,
   generateTrusteeKey,
+  genesisHash,
   isCredentialPubkey,
   normalizeTrackingCode,
   partialDecrypt,
@@ -375,7 +376,7 @@ export function createMockBackend(options: MockOptions = {}): { client: ApiClien
       run(() => {
         const s = get(id)
         const last = s.board.at(-1)
-        return last ? { seq: last.seq, hash: last.hash } : { seq: 0, hash: '' }
+        return last ? { seq: last.seq, hash: last.hash } : { seq: 0, hash: genesisHash(id) }
       }),
     getRegistrations: (id) => run(() => [...get(id).registrations.values()].map(({ electionId: _e, ...r }) => clone(r))),
     getTally: (id) =>
@@ -399,7 +400,7 @@ export function createMockBackend(options: MockOptions = {}): { client: ApiClien
           board: s.board,
           tally: { aggregate: s.aggregate, partials: [...s.partials.values()] },
           result: s.result,
-          head: last ? { seq: last.seq, hash: last.hash } : { seq: 0, hash: '' },
+          head: last ? { seq: last.seq, hash: last.hash } : { seq: 0, hash: genesisHash(id) },
         })
       }),
 

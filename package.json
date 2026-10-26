@@ -6,7 +6,8 @@
   "type": "module",
   "workspaces": [
     "packages/crypto",
-    "packages/api"
+    "packages/api",
+    "apps/backend"
   ],
   "scripts": {
     "build": "npm run build:packages && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier -w @evoting/simulator -w @evoting/attacks && npm run build -w web",
@@ -16,5 +17,8 @@
   },
   "engines": {
     "node": ">=22.12"
+  },
+  "overrides": {
+    "multer": "2.5.0"
   }
 }

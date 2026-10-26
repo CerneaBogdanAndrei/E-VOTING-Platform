@@ -1,0 +1,42 @@
+{
+  "name": "@evoting/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend NestJS + PostgreSQL: înregistrare, validare, bulletin board, numărare",
+  "type": "module",
+  "main": "./dist/src/main.js",
+  "exports": {
+    "./test-pki": {
+      "types": "./dist/src/nfc/test-pki.d.ts",
+      "default": "./dist/src/nfc/test-pki.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/main.js",
+    "dev": "tsc -p tsconfig.json && node --env-file-if-exists=.env dist/src/main.js",
+    "migrate": "node --env-file-if-exists=.env dist/src/db/migrate-cli.js",
+    "test-pki": "node dist/src/nfc/test-pki-cli.js",
+    "test": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0",
+    "@nestjs/common": "^12.2.0",
+    "@nestjs/core": "^12.2.0",
+    "@nestjs/platform-express": "^12.2.0",
+    "@nestjs/throttler": "^6.7.1",
+    "asn1js": "^4.0.0",
+    "multer": "^2.5.0",
+    "pg": "^8.23.1",
+    "pkijs": "^4.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "typescript": "~6.0.3"
+  }
+}
