@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "ro.udjg.evoting"
     },
     "android": {
       "adaptiveIcon": {
@@ -16,7 +17,12 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "ro.udjg.evoting",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.NFC"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -24,7 +30,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera citește zona MRZ a buletinului. Imaginea se procesează doar pe telefon.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "scheme": "evote",
     "experiments": {

@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import { checkOwnEntry, normalizeTrackingCode } from '@evoting/crypto'
 import { api, ApiError, type BoardEntry } from '../../../api'
 import { Button, Card, Field, H2, Notice, P, Screen } from '../../../components/ui'
 import { errorMessage, formatDateTime, shortHash } from '../../../lib/format'
@@ -13,14 +14,26 @@ export default function VerifyScreen() {
   const [code, setCode] = useState(session.receipt?.trackingCode ?? '')
   const [busy, setBusy] = useState(false)
   const [found, setFound] = useState<BoardEntry>()
+  const [integrity, setIntegrity] = useState<{ ok: boolean; text: string }>()
   const [error, setError] = useState<{ text: string; notFound: boolean }>()
 
   const search = async () => {
     setBusy(true)
     setFound(undefined)
+    setIntegrity(undefined)
     setError(undefined)
     try {
-      setFound(await api.findBallot(id, code.replace(/\s/g, '')))
+      const trackingCode = normalizeTrackingCode(code)
+      const entry = await api.findBallot(id, trackingCode)
+      // telefonul recalculează hash-urile; dacă e buletinul trimis de aici, îl compară și cu amprenta păstrată local
+      const own = session.receipt && session.receipt.trackingCode === trackingCode ? session.receipt : undefined
+      const check = checkOwnEntry(id, entry, { trackingCode, ballotHash: own?.ballotHash })
+      setIntegrity(
+        check.ok
+          ? { ok: true, text: own ? 'Hash-urile recalculate pe telefon corespund, iar conținutul e identic cu buletinul trimis de pe acest telefon.' : 'Hash-urile recalculate pe telefon corespund codului.' }
+          : { ok: false, text: check.reason },
+      )
+      setFound(entry)
     } catch (err) {
       setError({ text: errorMessage(err), notFound: err instanceof ApiError && err.status === 404 })
     } finally {
@@ -53,9 +66,8 @@ export default function VerifyScreen() {
           <Row label="Primit" value={formatDateTime(found.receivedAt)} />
           <Row label="Hash anterior" value={shortHash(found.prevHash)} mono />
           <Row label="Criptotexte" value={`${found.ciphertexts.length} × (A, B)`} />
-          <Text style={styles.note}>
-            Hash-ul buletinului se potrivește cu codul tău, iar el depinde de hash-ul anterior. O modificare a buletinului sau a celor dinaintea lui ar
-            schimba codul.
+          <Text style={[styles.note, integrity && !integrity.ok && { color: colors.bad }]}>
+            {integrity?.text} Codul depinde și de hash-ul anterior, deci o modificare a buletinelor dinaintea lui l-ar schimba.
           </Text>
         </Card>
       )}

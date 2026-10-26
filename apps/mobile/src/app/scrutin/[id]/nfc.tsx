@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { api, mockTools } from '../../../api'
-import { newCredential } from '../../../api/ballot'
+import { generateCredential } from '@evoting/crypto'
+import { api, bytesToBase64, dg1FromMrz, mockTools } from '../../../api'
 import { Button, Card, Field, H2, Notice, Screen } from '../../../components/ui'
 import { errorMessage } from '../../../lib/format'
+import { nfcModule } from '../../../lib/native'
 import { useSession } from '../../../lib/session'
 import { colors, mono } from '../../../lib/theme'
 
@@ -22,18 +23,37 @@ export default function NfcScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
-  // Fără modulul nativ (JMRTD) cipul nu se poate citi; cu backend-ul simulat, citirea e simulată.
+  const register = async (dg1: string, sod: string) => {
+    const credential = generateCredential()
+    const registration = await api.registerNfc(id, { dg1, sod, credentialPubkey: credential.publicKey })
+    update({ credential, registration })
+    router.dismissTo({ pathname: '/scrutin/[id]', params: { id } })
+  }
+
+  /** Citirea reală: modulul nativ deschide PACE cu CAN-ul și citește DG1 și SOD prin JMRTD. */
+  const read = async () => {
+    if (!nfcModule) return
+    setBusy(true)
+    setError(undefined)
+    try {
+      if (!nfcModule.isEnabled()) throw new Error('NFC-ul e oprit. Pornește-l din setările telefonului.')
+      const { dg1, sod } = await nfcModule.readDocument(can)
+      await register(dg1, sod)
+    } catch (err) {
+      setError(errorMessage(err))
+      setBusy(false)
+    }
+  }
+
+  // Fără modulul nativ, cu backend-ul simulat: un „cip” de test cu MRZ-ul unui alegător eligibil.
   const simulate = async () => {
     if (!mockTools) return
     setBusy(true)
     setError(undefined)
     try {
-      const cnp = await mockTools.sampleCnp(id)
-      if (!cnp) throw new Error('Nu mai există CNP-uri de test neînregistrate la acest scrutin.')
-      const dg1 = btoa(`IDROU${'<'.repeat(9)}${cnp}${'<'.repeat(4)}`)
-      const registration = await api.registerNfc(id, { dg1, sod: '', credentialPubkey: newCredential() })
-      update({ registration })
-      router.dismissTo({ pathname: '/scrutin/[id]', params: { id } })
+      const mrz = await mockTools.sampleMrz(id, 'TD1')
+      if (!mrz) throw new Error('Nu mai există CNP-uri de test neînregistrate la acest scrutin.')
+      await register(bytesToBase64(dg1FromMrz(mrz)), '')
     } catch (err) {
       setError(errorMessage(err))
       setBusy(false)
@@ -64,10 +84,15 @@ export default function NfcScreen() {
       />
 
       {error && <Notice tone="bad" text={error} />}
-      {mockTools ? (
-        <Button title="Simulează citirea cipului" onPress={simulate} disabled={can.length !== 6} loading={busy} />
+      {nfcModule?.isSupported() ? (
+        <Button title={busy ? 'Ține telefonul lângă buletin…' : 'Citește cipul'} onPress={read} disabled={can.length !== 6} loading={busy} />
+      ) : mockTools ? (
+        <>
+          <Notice tone="warn" text="Modulul NFC nativ lipsește (Expo Go sau web). Cu backend-ul simulat, citirea cipului se simulează." />
+          <Button title="Simulează citirea cipului" onPress={simulate} disabled={can.length !== 6} loading={busy} />
+        </>
       ) : (
-        <Notice tone="warn" text="Citirea NFC are nevoie de modulul nativ (JMRTD), care nu e încă integrat în aplicație." />
+        <Notice tone="warn" text="Citirea NFC are nevoie de modulul nativ (JMRTD) dintr-un development build Android: npx expo run:android." />
       )}
 
       <Card>

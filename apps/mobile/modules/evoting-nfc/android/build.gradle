@@ -1,0 +1,28 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'ro.udjg.evoting.nfc'
+version = '1.0.0'
+
+android {
+  namespace 'ro.udjg.evoting.nfc'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+  packaging {
+    resources {
+      // BouncyCastle și JMRTD aduc fișiere META-INF duplicate
+      excludes += ['META-INF/versions/9/OSGI-INF/MANIFEST.MF', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+    }
+  }
+}
+
+dependencies {
+  // JMRTD: ICAO 9303 (PACE, citirea DG1/SOD), cu SCUBA pentru IsoDep pe Android
+  implementation 'org.jmrtd:jmrtd:0.8.9'
+  implementation 'net.sf.scuba:scuba-sc-android:0.0.27'
+  implementation 'org.bouncycastle:bcprov-jdk18on:1.86'
+}

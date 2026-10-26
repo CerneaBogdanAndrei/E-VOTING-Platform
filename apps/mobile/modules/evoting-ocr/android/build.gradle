@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'ro.udjg.evoting.ocr'
+version = '1.0.0'
+
+android {
+  namespace 'ro.udjg.evoting.ocr'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // Recunoaștere de text pe dispozitiv, cu modelul inclus în aplicație (fără rețea)
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}

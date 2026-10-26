@@ -13,7 +13,6 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { apiMode, type ElectionStatus } from '../api'
-import { CRYPTO_READY } from '../api/ballot'
 import { statusLabel } from '../lib/format'
 import { colors, radius } from '../lib/theme'
 
@@ -126,7 +125,7 @@ export function ModeBanner() {
     <View style={styles.banner}>
       <Text style={styles.bannerText}>
         {label}
-        {CRYPTO_READY ? '' : ' · criptare: placeholder'}
+        {' · ElGamal pe ristretto255'}
       </Text>
     </View>
   )
