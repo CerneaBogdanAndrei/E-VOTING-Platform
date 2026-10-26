@@ -1,0 +1,17 @@
+{
+  "name": "@evoting/simulator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Alegeri simulate cap-coadă cu alegători sintetici, contra backend-ului real, cu metrici de performanță",
+  "type": "module",
+  "bin": { "evoting-simulate": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/backend": "1.0.0",
+    "@evoting/crypto": "1.0.0"
+  }
+}

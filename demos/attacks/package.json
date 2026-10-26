@@ -1,0 +1,21 @@
+{
+  "name": "@evoting/attacks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demonstrațiile de atac din plan, rulate pe sistemul propriu cu date fictive",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "cnp": "node dist/cnp-dictionary.js",
+    "deterministic": "node dist/deterministic-encryption.js",
+    "bsgs": "node dist/bsgs-vs-key.js",
+    "bruteforce": "node dist/api-bruteforce.js",
+    "tamper": "node dist/tamper-board.js"
+  },
+  "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0",
+    "pg": "^8.23.1"
+  }
+}

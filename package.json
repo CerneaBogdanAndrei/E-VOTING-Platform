@@ -7,7 +7,11 @@
   "workspaces": [
     "packages/crypto",
     "packages/api",
-    "apps/backend"
+    "apps/backend",
+    "tools/trustee",
+    "tools/verifier",
+    "tools/simulator",
+    "demos/attacks"
   ],
   "scripts": {
     "build": "npm run build:packages && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier -w @evoting/simulator -w @evoting/attacks && npm run build -w web",

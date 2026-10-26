@@ -1,0 +1,16 @@
+{
+  "name": "@evoting/trustee",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CLI pentru trustees: generarea cheii și decriptarea parțială",
+  "type": "module",
+  "bin": { "evoting-trustee": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0"
+  }
+}
