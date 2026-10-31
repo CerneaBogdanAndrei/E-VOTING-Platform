@@ -33,3 +33,21 @@ cp .env.example .env && docker compose up --build # tot sistemul: web :8080, API
 ```
 
 Pașii detaliați, cu backend-ul real, trustees și verificarea, sunt în [DOCUMENTATIE.md](DOCUMENTATIE.md#3-pornire).
+
+## Baza de date în Supabase
+
+1. Creezi proiectul pe [supabase.com](https://supabase.com). Parola bazei de date o păstrezi doar la tine, nu o trimiți nimănui.
+2. Butonul **Connect** din partea de sus → **Session pooler** → copiezi URI-ul (portul 5432) și înlocuiești `[YOUR-PASSWORD]`.
+3. În `apps/backend/.env` (nu se urcă pe GitHub) pui:
+   ```
+   DATABASE_URL=postgresql://postgres.<ref>:<parola>@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+   CNP_HMAC_KEY=<openssl rand -hex 32>
+   ADMIN_TOKEN=<openssl rand -hex 24>
+   ```
+4. `npm run build -w @evoting/backend && npm run dev -w @evoting/backend`. La pornire, backend-ul creează singur
+   tabelele (migrările din `apps/backend/migrations/`), deci nu trebuie să lipești nimic în SQL Editor. Dacă vrei
+   doar tabelele, fără să pornești serverul: `npm run migrate -w @evoting/backend`.
+
+SSL-ul se activează automat pentru orice server care nu e local (`DATABASE_SSL=off` îl oprește). Migrarea
+`002_rls.sql` pornește Row Level Security pe toate tabelele, ca datele să nu fie accesibile prin API-ul REST
+public al Supabase; backend-ul se conectează ca proprietar și nu e afectat.

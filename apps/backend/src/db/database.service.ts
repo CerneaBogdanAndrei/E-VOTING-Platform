@@ -1,6 +1,7 @@
 import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common'
 import pg from 'pg'
 import { CONFIG, type AppConfig } from '../config.js'
+import { pgOptions } from './pg-options.js'
 
 export interface Queryable {
   query<T extends pg.QueryResultRow = pg.QueryResultRow>(text: string, values?: unknown[]): Promise<pg.QueryResult<T>>
@@ -11,7 +12,7 @@ export class Database implements OnApplicationShutdown {
   readonly pool: pg.Pool
 
   constructor(@Inject(CONFIG) config: AppConfig) {
-    this.pool = new pg.Pool({ connectionString: config.databaseUrl, max: 20 })
+    this.pool = new pg.Pool({ ...pgOptions(config.databaseUrl), max: 20 })
   }
 
   query<T extends pg.QueryResultRow = pg.QueryResultRow>(text: string, values?: unknown[]) {

@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://evoting:${POSTGRES_PASSWORD:-evoting}@db:5432/evoting
+      DATABASE_SSL: "off"
       CNP_HMAC_KEY: ${CNP_HMAC_KEY:?setează CNP_HMAC_KEY în .env (openssl rand -hex 32)}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?setează ADMIN_TOKEN în .env}
       SESSION_SECRET: ${SESSION_SECRET:-}

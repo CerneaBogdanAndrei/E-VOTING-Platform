@@ -4,11 +4,12 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import { pgOptions } from './pg-options.js'
 
 const MIGRATIONS_DIR = fileURLToPath(new URL('../../../migrations/', import.meta.url))
 
 export async function migrate(databaseUrl: string, log: (msg: string) => void = () => undefined): Promise<string[]> {
-  const client = new pg.Client({ connectionString: databaseUrl })
+  const client = new pg.Client(pgOptions(databaseUrl))
   await client.connect()
   const applied: string[] = []
   try {
