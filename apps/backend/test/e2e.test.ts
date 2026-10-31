@@ -45,6 +45,7 @@ describe('backend: scrutin complet pe PostgreSQL', { skip: !available }, () => {
   let trusteeTokens: { trusteeId: string; token: string }[]
   const keys: TrusteeKeyPair[] = []
   const voters = CNPS.map(() => generateCredential())
+  let raceChoice = 0
 
   before(async () => {
     await resetDatabase()
@@ -180,6 +181,8 @@ describe('backend: scrutin complet pe PostgreSQL', { skip: !available }, () => {
       s.api.castBallot(election.id, prepareBallot(election, voters[2], 2).ballot, t2),
     ])
     assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
+    // care dintre cele două câștigă cursa e întâmplător; rezultatul final ține cont de el
+    raceChoice = results[0].status === 'fulfilled' ? 0 : 2
     const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult
     assert.equal((rejected.reason as ApiError).status, 409)
   })
@@ -209,7 +212,9 @@ describe('backend: scrutin complet pe PostgreSQL', { skip: !available }, () => {
     election = await s.api.submitPartialDecryption(election.id, trusteeTokens[1].token, partialDecrypt(keys[1], tally.aggregate!))
     assert.equal(election.status, 'tallied')
     const result = await s.api.getResult(election.id)
-    assert.deepEqual(result.counts.map((c) => c.votes), [1, 2, 1])
+    const expected = [0, 2, 1]
+    expected[raceChoice]++
+    assert.deepEqual(result.counts.map((c) => c.votes), expected)
     assert.equal(result.totalBallots, 4)
   })
 
