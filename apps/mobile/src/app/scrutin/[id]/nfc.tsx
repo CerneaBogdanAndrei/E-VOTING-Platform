@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { api, mockTools } from '../../../api'
-import { newCredential } from '../../../api/ballot'
+import { generateCredential } from '@evoting/crypto'
+import { api } from '../../../api'
+import { useServerInfo } from '../../../lib/useServerInfo'
 import { Button, Card, Field, H2, Notice, Screen } from '../../../components/ui'
 import { errorMessage } from '../../../lib/format'
 import { useSession } from '../../../lib/session'
@@ -21,18 +22,19 @@ export default function NfcScreen() {
   const [can, setCan] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const info = useServerInfo()
 
-  // Fără modulul nativ (JMRTD) cipul nu se poate citi; cu backend-ul simulat, citirea e simulată.
+  // Fără modulul nativ (JMRTD) cipul nu se poate citi. În modul demo, serverul dă un „cip” de test
+  // (DG1 + SOD semnate de un CSCA de test), iar Passive Authentication rulează pe server exact ca la un buletin real.
   const simulate = async () => {
-    if (!mockTools) return
     setBusy(true)
     setError(undefined)
     try {
-      const cnp = await mockTools.sampleCnp(id)
-      if (!cnp) throw new Error('Nu mai există CNP-uri de test neînregistrate la acest scrutin.')
-      const dg1 = btoa(`IDROU${'<'.repeat(9)}${cnp}${'<'.repeat(4)}`)
-      const registration = await api.registerNfc(id, { dg1, sod: '', credentialPubkey: newCredential() })
-      update({ registration })
+      const doc = await api.demo.testDocument(id)
+      if (!doc) throw new Error('Serverul nu are un CSCA de test.')
+      const credential = generateCredential()
+      const registration = await api.registerNfc(id, { dg1: doc.dg1, sod: doc.sod, credentialPubkey: credential.publicKey })
+      update({ credential, registration })
       router.dismissTo({ pathname: '/scrutin/[id]', params: { id } })
     } catch (err) {
       setError(errorMessage(err))
@@ -64,7 +66,7 @@ export default function NfcScreen() {
       />
 
       {error && <Notice tone="bad" text={error} />}
-      {mockTools ? (
+      {info?.demoMode ? (
         <Button title="Simulează citirea cipului" onPress={simulate} disabled={can.length !== 6} loading={busy} />
       ) : (
         <Notice tone="warn" text="Citirea NFC are nevoie de modulul nativ (JMRTD), care nu e încă integrat în aplicație." />

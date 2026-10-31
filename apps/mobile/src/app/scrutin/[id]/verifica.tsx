@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import { ballotHash, entryHash } from '@evoting/crypto'
 import { api, ApiError, type BoardEntry } from '../../../api'
 import { Button, Card, Field, H2, Notice, P, Screen } from '../../../components/ui'
 import { errorMessage, formatDateTime, shortHash } from '../../../lib/format'
@@ -52,10 +53,13 @@ export default function VerifyScreen() {
           <Row label="Poziție" value={`#${found.seq}`} />
           <Row label="Primit" value={formatDateTime(found.receivedAt)} />
           <Row label="Hash anterior" value={shortHash(found.prevHash)} mono />
-          <Row label="Criptotexte" value={`${found.ciphertexts.length} × (A, B)`} />
+          <Row label="Criptotexte" value={`${found.ballot.ciphertexts.length} × (A, B)`} />
+          <Row label="Hash-ul buletinului, recalculat pe telefon" value={ballotHash(found.ballot) === found.trackingCode ? 'corespunde' : 'NU corespunde'} />
+          <Row label="Hash-ul intrării, recalculat" value={entryHash(id, found) === found.hash ? 'corespunde' : 'NU corespunde'} />
+          {session.receipt && <Row label="Credentialul" value={found.ballot.credentialPubkey === session.credential?.publicKey ? 'al tău' : 'al altcuiva'} />}
           <Text style={styles.note}>
-            Hash-ul buletinului se potrivește cu codul tău, iar el depinde de hash-ul anterior. O modificare a buletinului sau a celor dinaintea lui ar
-            schimba codul.
+            Telefonul a recalculat hash-ul buletinului de pe board: e exact codul tău, deci buletinul n-a fost modificat. Hash-ul intrării leagă buletinul
+            de cel anterior, așa că și ștergerea sau reordonarea buletinelor dinainte s-ar vedea.
           </Text>
         </Card>
       )}

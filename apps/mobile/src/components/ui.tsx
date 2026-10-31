@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react'
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -12,8 +12,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native'
-import { apiMode, type ElectionStatus } from '../api'
-import { CRYPTO_READY } from '../api/ballot'
+import { apiUrl, serverInfo, type ElectionStatus } from '../api'
 import { statusLabel } from '../lib/format'
 import { colors, radius } from '../lib/theme'
 
@@ -121,13 +120,15 @@ export function Field({ label, hint, error, ...input }: TextInputProps & { label
 }
 
 export function ModeBanner() {
-  const label = apiMode.kind === 'mock' ? 'Backend simulat (date de test)' : `API: ${apiMode.url}`
+  const [label, setLabel] = useState(`API: ${apiUrl}`)
+  useEffect(() => {
+    serverInfo()
+      .then((i) => setLabel(`API: ${apiUrl}${i.demoMode ? ' · mod demo' : ''}`))
+      .catch(() => setLabel(`Backend indisponibil (${apiUrl})`))
+  }, [])
   return (
     <View style={styles.banner}>
-      <Text style={styles.bannerText}>
-        {label}
-        {CRYPTO_READY ? '' : ' · criptare: placeholder'}
-      </Text>
+      <Text style={styles.bannerText}>{label}</Text>
     </View>
   )
 }
