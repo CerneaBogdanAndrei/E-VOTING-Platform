@@ -1,0 +1,43 @@
+# Pornirea întregului sistem pentru demo: PostgreSQL + backend + panoul web.
+#   docker compose up --build
+#   web:     http://localhost:8080   (parola comisiei: ADMIN_PASSWORD, implicit „comisie”)
+#   backend: http://localhost:3000
+# Aplicația mobilă rulează separat (cd apps/mobile && npx expo start), cu EXPO_PUBLIC_API_URL=http://<IP>:3000.
+# Pentru Supabase în loc de PostgreSQL local: șterge serviciul db și pune DATABASE_URL-ul Supabase la backend.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: evoting
+    volumes:
+      - ./apps/backend/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d evoting"]
+      interval: 2s
+      retries: 30
+
+  backend:
+    build: { context: ., target: backend }
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/evoting
+      DATABASE_SSL: "off"
+      CNP_HMAC_KEY: ${CNP_HMAC_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-comisie}
+      DEMO_MODE: ${DEMO_MODE:-true}
+    ports: ["3000:3000"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      target: web
+      args: { VITE_API_URL: "${PUBLIC_API_URL:-http://localhost:3000}" }
+    ports: ["8080:80"]
+    depends_on: [backend]
+
+volumes:
+  pgdata:

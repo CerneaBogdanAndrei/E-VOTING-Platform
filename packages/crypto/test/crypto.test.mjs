@@ -364,3 +364,43 @@ describe('CNP și HMAC', () => {
     assert.equal(C.cnpFingerprint(serverKey, victim), leakedHmac, 'cu cheia corectă amprenta e stabilă')
   })
 })
+
+describe('MRZ (ICAO 9303)', () => {
+  test('cifra de control 7-3-1 pe exemplul din standard', () => {
+    assert.equal(C.mrzCheckDigit('L898902C3'), 6)
+    assert.equal(C.mrzCheckDigit('740812'), 2)
+    assert.equal(C.mrzCheckDigit('120415'), 9)
+  })
+
+  test('TD1 (CEI): se parsează, cifrele de control trec, CNP-ul e extras', () => {
+    const cnp = C.generateCnp(C.seededRandom(11))
+    const lines = C.buildTd1({ documentNumber: 'RX123456', birthDate: cnp.slice(1, 7), sex: 'F', expiryDate: '351231', surname: 'Ionescu', givenNames: 'Maria', cnp })
+    const p = C.parseMrz(lines.join('\n'))
+    assert.equal(p.format, 'TD1')
+    assert.equal(p.valid, true)
+    assert.equal(p.cnp, cnp)
+    assert.equal(p.surname, 'IONESCU')
+    assert.equal(C.parseMrz(lines.join('')).cnp, cnp, 'și dintr-un singur șir (DG1)')
+  })
+
+  test('o eroare de OCR într-o cifră e prinsă de cifra de control', () => {
+    const cnp = C.generateCnp(C.seededRandom(12))
+    const lines = C.buildTd1({ documentNumber: 'RX123456', birthDate: cnp.slice(1, 7), sex: 'M', expiryDate: '351231', surname: 'Pop', givenNames: 'Ion', cnp })
+    const misread = [lines[0], lines[1].slice(0, 9) + ((Number(lines[1][9]) + 1) % 10) + lines[1].slice(10), lines[2]]
+    const p = C.parseMrz(misread.join('\n'))
+    assert.equal(p.valid, false)
+    assert.ok(p.checks.some((c) => !c.ok && c.name === 'data expirării'))
+  })
+
+  test('TD2 (buletinul vechi): CNP reconstruit din prima cifră, data nașterii și ultimele 6 cifre', () => {
+    const cnp = C.generateCnp(C.seededRandom(13))
+    const doc = 'AB1234567', dob = cnp.slice(1, 7), exp = '301231', opt = (cnp[0] + cnp.slice(7)).padEnd(7, '<')
+    const l1 = 'IDROUPOPESCU<<ANDREI'.padEnd(36, '<')
+    const head = `${doc}${C.mrzCheckDigit(doc)}ROU${dob}${C.mrzCheckDigit(dob)}M${exp}${C.mrzCheckDigit(exp)}${opt}`
+    const l2 = head + C.mrzCheckDigit(head.slice(0, 10) + head.slice(13, 20) + head.slice(21, 35))
+    const p = C.parseMrz(`${l1}\n${l2}`)
+    assert.equal(p.format, 'TD2')
+    assert.equal(p.valid, true)
+    assert.equal(p.cnp, cnp)
+  })
+})
