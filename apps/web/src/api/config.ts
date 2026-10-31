@@ -1,2 +1,2 @@
-/** URL-ul backend-ului. Necompletat = backend simulat în memorie. */
-export const API_URL: string | undefined = import.meta.env.VITE_API_URL || undefined
+/** URL-ul backend-ului (VITE_API_URL în .env.local). */
+export const API_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:3000'

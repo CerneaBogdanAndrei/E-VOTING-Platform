@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router'
-import { apiMode } from '../api'
-import { CRYPTO_READY } from '../api/ballot'
+import { apiUrl, serverInfo, type ServerInfo } from '../api'
+import { useAsync } from '../lib/useAsync'
 
 export function Layout() {
+  const info = useAsync<ServerInfo>(() => serverInfo(), [])
   return (
     <div className="app">
       <header className="topbar">
@@ -20,11 +21,12 @@ export function Layout() {
             <NavLink to="/" end>
               Scrutine
             </NavLink>
+            <NavLink to="/audit">Verifică un buletin</NavLink>
             <NavLink to="/comisie">Comisie</NavLink>
           </nav>
-          <div className="mode" title={apiMode.kind === 'http' ? apiMode.url : 'Datele se pierd la reîncărcarea paginii'}>
-            {apiMode.kind === 'mock' ? 'Backend simulat' : `API: ${apiMode.url}`}
-            {!CRYPTO_READY && <span className="mode-sep">· criptare: placeholder</span>}
+          <div className="mode" title={apiUrl}>
+            {info.error ? <span className="mode-bad">backend indisponibil</span> : info.data ? `API: ${apiUrl}` : 'se conectează…'}
+            {info.data?.demoMode && <span className="mode-sep">· mod demo</span>}
           </div>
         </div>
       </header>

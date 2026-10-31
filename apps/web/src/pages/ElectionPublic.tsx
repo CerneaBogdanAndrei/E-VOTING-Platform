@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { api, ApiError, type BoardEntry, type Election } from '../api'
+import { VerifyPanel } from '../components/VerifyPanel'
 import { ErrorBox, Hash, Loading, Stat, StatusBadge } from '../components/ui'
 import { formatDateTime, formatInterval, percent } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 
-type Tab = 'board' | 'rezultat' | 'parametri'
+type Tab = 'board' | 'rezultat' | 'verificare' | 'parametri' | 'jurnal'
 
 export function ElectionPublic() {
   const { id = '' } = useParams()
@@ -46,7 +47,9 @@ export function ElectionPublic() {
           [
             ['board', 'Bulletin board'],
             ['rezultat', 'Rezultat'],
+            ['verificare', 'Verificare publică'],
             ['parametri', 'Parametri publici'],
+            ['jurnal', 'Jurnal de audit'],
           ] as const
         ).map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} className="tab" onClick={() => setTab(key)}>
@@ -57,7 +60,9 @@ export function ElectionPublic() {
 
       {tab === 'board' && <Board election={e} />}
       {tab === 'rezultat' && <Result election={e} />}
+      {tab === 'verificare' && <VerifyPanel election={e} />}
       {tab === 'parametri' && <Parameters election={e} />}
+      {tab === 'jurnal' && <AuditLog election={e} />}
     </>
   )
 }
@@ -99,7 +104,8 @@ function Board({ election }: { election: Election }) {
       </form>
       {lookup.entry && (
         <div role="alert" className="alert alert-ok">
-          Buletinul #{lookup.entry.seq} e pe board, nemodificat, primit la {formatDateTime(lookup.entry.receivedAt)}.
+          Buletinul #{lookup.entry.seq} e pe board, primit la {formatDateTime(lookup.entry.receivedAt)}. Codul de urmărire e hash-ul conținutului său,
+          deci orice modificare l-ar fi schimbat.
         </div>
       )}
       {lookup.error && <div role="alert" className="alert alert-bad">{lookup.error}</div>}
@@ -113,6 +119,7 @@ function Board({ election }: { election: Election }) {
               <tr>
                 <th>#</th>
                 <th>Cod de urmărire</th>
+                <th>Hash intrare</th>
                 <th>Hash anterior</th>
                 <th>Credential</th>
                 <th>Criptotexte</th>
@@ -124,15 +131,18 @@ function Board({ election }: { election: Election }) {
                 <tr key={b.seq} className={lookup.entry?.seq === b.seq ? 'row-hit' : undefined}>
                   <td className="num">{b.seq}</td>
                   <td>
+                    <Hash value={b.trackingCode} />
+                  </td>
+                  <td>
                     <Hash value={b.hash} />
                   </td>
                   <td>
                     <Hash value={b.prevHash} />
                   </td>
                   <td>
-                    <Hash value={b.credentialPubkey} head={6} tail={4} />
+                    <Hash value={b.ballot.credentialPubkey} head={6} tail={4} />
                   </td>
-                  <td className="muted">{b.ciphertexts.length} × (A, B)</td>
+                  <td className="muted">{b.ballot.ciphertexts.length} × (A, B)</td>
                   <td className="muted nowrap">{formatDateTime(b.receivedAt)}</td>
                 </tr>
               ))}
@@ -173,8 +183,12 @@ function Result({ election }: { election: Election }) {
     <section className="section">
       <p className="hint">
         Totalurile vin din agregarea homomorfă a criptotextelor de pe board, decriptată împreună de trustees. Publicat la{' '}
-        {formatDateTime(r.publishedAt)}, din {r.totalBallots} buletine.
+        {formatDateTime(r.publishedAt)}, din {r.totalBallots} buletine. Verificați-le singuri în tab-ul „Verificare publică”.
       </p>
+      <div className={`alert ${r.quorumReached ? 'alert-ok' : 'alert-warn'}`}>
+        Cvorum (1/3 + 1 din {r.eligible} eligibili): {r.quorum} · participare {r.totalBallots} ({percent(r.totalBallots, r.eligible)}) ·{' '}
+        {r.quorumReached ? 'atins' : 'neatins'}
+      </div>
       <div className="results">
         {rows.map(({ c, votes }, i) => (
           <div key={c.id} className="result-row">
@@ -203,11 +217,19 @@ function Parameters({ election }: { election: Election }) {
         <h3>Cheia scrutinului</h3>
         <p className="hint">Y = Y₁ + Y₂ + Y₃: se criptează cu ea, dar decriptarea cere toți trustees.</p>
         {election.publicKey ? <Hash value={election.publicKey} head={16} tail={12} /> : <span className="muted">Încă negenerată</span>}
+        <div className="kv mt-s">
+          <span>Opțiuni permise per buletin</span>
+          <span>{election.minSelections === election.maxSelections ? `exact ${election.maxSelections}` : `între ${election.minSelections} și ${election.maxSelections}`}</span>
+        </div>
+        <div className="kv">
+          <span>Grup</span>
+          <span>ristretto255 (ElGamal exponențial)</span>
+        </div>
         <h3 className="mt">Candidați, în ordinea din vectorul de vot</h3>
         <ol className="list">
           {election.candidates.map((c) => (
             <li key={c.id}>
-              <strong>{c.name}</strong> <span className="muted">· {c.description}</span>
+              <strong>{c.name}</strong>{c.description && <span className="muted"> · {c.description}</span>}
             </li>
           ))}
         </ol>
@@ -222,6 +244,41 @@ function Parameters({ election }: { election: Election }) {
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+  )
+}
+
+function AuditLog({ election }: { election: Election }) {
+  const log = useAsync(() => api.getAuditLog(election.id), [election.id, election.status, election.stats.eligible])
+  if (log.error) return <ErrorBox error={log.error} onRetry={log.reload} />
+  if (!log.data) return <Loading />
+  return (
+    <section className="section">
+      <p className="hint">Acțiunile comisiei, ale trustees și ale serverului, în ordine. Lista eligibililor apare doar ca număr: CNP-urile nu se păstrează.</p>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Când</th>
+              <th>Cine</th>
+              <th>Acțiune</th>
+              <th>Detalii</th>
+            </tr>
+          </thead>
+          <tbody>
+            {log.data.map((a) => (
+              <tr key={a.id}>
+                <td className="num">{a.id}</td>
+                <td className="muted nowrap">{formatDateTime(a.createdAt)}</td>
+                <td>{a.actor}</td>
+                <td>{a.action}</td>
+                <td className="muted small mono">{Object.keys(a.payload).length ? JSON.stringify(a.payload).slice(0, 140) : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   )

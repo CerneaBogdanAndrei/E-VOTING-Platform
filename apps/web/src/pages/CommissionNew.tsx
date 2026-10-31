@@ -36,6 +36,8 @@ export function CommissionNew() {
     row('Observatori independenți'),
     row('Reprezentanții candidaților'),
   ])
+  const [maxSelections, setMaxSelections] = useState(1)
+  const [allowBlank, setAllowBlank] = useState(false)
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
 
@@ -60,6 +62,8 @@ export function CommissionNew() {
         closesAt: new Date(closesAt).toISOString(),
         candidates: candidates.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), description: c.description.trim() })),
         trustees: trustees.filter((t) => t.name.trim()).map((t) => ({ name: t.name.trim() })),
+        maxSelections,
+        minSelections: allowBlank ? 0 : 1,
       })
       navigate(`/comisie/${created.id}`)
     } catch (err) {
@@ -128,6 +132,28 @@ export function CommissionNew() {
           <button type="button" className="btn btn-small" onClick={() => setCandidates([...candidates, row()])}>
             + Candidat
           </button>
+          <div className="grid-2 mt">
+            <label className="field">
+              <span>Câți candidați poate alege un alegător</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={Math.max(1, candidates.length)}
+                value={maxSelections}
+                onChange={(e) => setMaxSelections(Math.max(1, Math.min(candidates.length, Number(e.target.value) || 1)))}
+              />
+            </label>
+            <label className="field field-check">
+              <input type="checkbox" checked={allowBlank} onChange={(e) => setAllowBlank(e.target.checked)} />
+              <span>Permite vot alb (nicio opțiune bifată)</span>
+            </label>
+          </div>
+          <p className="hint">
+            {maxSelections === 1
+              ? 'Un singur candidat per alegător: dovada ZK arată că suma voturilor e exact 1.'
+              : `Până la ${maxSelections} candidați (de exemplu, mai mulți reprezentanți în Consiliul Facultății): dovada ZK arată că suma e între ${allowBlank ? 0 : 1} și ${maxSelections}.`}
+          </p>
         </div>
 
         <div className="card">

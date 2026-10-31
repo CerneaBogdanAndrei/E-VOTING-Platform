@@ -3,6 +3,7 @@ import { api } from '../api'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { formatInterval } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
+import { logout } from '../components/RequireAdmin'
 
 export function Commission() {
   const { data, error, loading, reload } = useAsync(() => api.listElections(), [])
@@ -14,9 +15,14 @@ export function Commission() {
           <h1>Panoul comisiei</h1>
           <p className="lead">Creează scrutine, importă lista eligibililor și deschide sau închide votul.</p>
         </div>
-        <Link to="/comisie/nou" className="btn btn-primary">
-          Scrutin nou
-        </Link>
+        <div className="row gap-s">
+          <button type="button" className="btn" onClick={logout}>
+            Ieșire
+          </button>
+          <Link to="/comisie/nou" className="btn btn-primary">
+            Scrutin nou
+          </Link>
+        </div>
       </div>
 
       {loading && !data && <Loading />}

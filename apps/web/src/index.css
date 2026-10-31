@@ -677,3 +677,31 @@ textarea.input {
     grid-row: 2;
   }
 }
+
+/* ── Adăugiri: autentificare, verificator, proces-verbal ── */
+.mode-bad { color: #b42318; font-weight: 600; }
+.login { display: flex; justify-content: center; padding-top: 48px; }
+.login .card { width: min(420px, 100%); display: grid; gap: 14px; }
+.field-check { flex-direction: row; align-items: center; gap: 8px; display: flex; padding-top: 24px; }
+.invite { align-items: flex-start; }
+.code { white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; font-size: 12px; background: rgba(0, 0, 0, 0.04); padding: 8px; border-radius: 6px; }
+details summary { cursor: pointer; font-size: 14px; margin-bottom: 6px; }
+.verify-steps { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; }
+.verify-steps li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line, #e3e7ef); border-radius: 10px; }
+.verify-steps li.ok .verify-mark { color: #067647; }
+.verify-steps li.bad { border-color: #fda29b; background: #fef3f2; }
+.verify-steps li.bad .verify-mark { color: #b42318; }
+.verify-steps li.skipped .verify-mark { color: #b54708; }
+.verify-mark { font-weight: 700; width: 16px; font-size: 16px; }
+.verify-problem { color: #b42318; font-size: 13px; margin-top: 4px; }
+.report { max-width: 780px; margin: 0 auto; padding: 32px 24px; font-family: Georgia, 'Times New Roman', serif; color: #111; background: #fff; }
+.report h1 { text-align: center; margin-bottom: 0; letter-spacing: 2px; }
+.report-sub { text-align: center; margin-top: 4px; }
+.report h2 { font-size: 17px; margin-top: 24px; }
+.report-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.report-table td, .report-table th { border: 1px solid #999; padding: 6px 8px; text-align: left; }
+.report-table td:last-child { white-space: nowrap; }
+.report .mono { font-size: 11px; word-break: break-all; }
+.report-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 40px; }
+.report-actions { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+@media print { .no-print { display: none; } .report { padding: 0; } }

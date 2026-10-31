@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
 import { Link, useParams } from 'react-router'
-import { api, mockTools, type Election, type EligibleImportResult } from '../api'
+import { api, apiUrl, serverInfo, type Election, type EligibleImportResult, type TrusteeInvite } from '../api'
 import { ErrorBox, Hash, Loading, Stat, StatusBadge } from '../components/ui'
 import { formatInterval, percent } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
@@ -8,6 +8,9 @@ import { useAsync } from '../lib/useAsync'
 export function CommissionElection() {
   const { id = '' } = useParams()
   const election = useAsync(() => api.getElection(id), [id])
+  const info = useAsync(() => serverInfo(), [])
+  const [invite, setInvite] = useState<TrusteeInvite>()
+  const [demoCnps, setDemoCnps] = useState<string[]>([])
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ kind: 'ok' | 'bad'; text: string }>()
 
@@ -50,6 +53,11 @@ export function CommissionElection() {
           <Link to={`/scrutin/${e.id}`} className="btn">
             Pagina publică
           </Link>
+          {e.status === 'tallied' && (
+            <Link to={`/scrutin/${e.id}/proces-verbal`} className="btn">
+              Proces-verbal
+            </Link>
+          )}
           {e.status === 'draft' && (
             <button
               type="button"
@@ -79,7 +87,7 @@ export function CommissionElection() {
 
       <div className="stats">
         <Stat label="Eligibili" value={e.stats.eligible} />
-        <Stat label="Înregistrați" value={e.stats.registered} hint={percent(e.stats.registered, e.stats.eligible)} />
+        <Stat label="Înregistrați" value={e.stats.registered} hint={`${percent(e.stats.registered, e.stats.eligible)} · ${e.stats.registeredNfc} prin NFC`} />
         <Stat label="Buletine" value={e.stats.ballots} hint={`participare ${percent(e.stats.ballots, e.stats.eligible)}`} />
         <Stat label="Cvorum (1/3 + 1)" value={quorum} hint={e.stats.ballots >= quorum ? 'atins' : `mai trebuie ${quorum - e.stats.ballots}`} />
       </div>
@@ -97,6 +105,16 @@ export function CommissionElection() {
               <li key={t.id} className="trustee">
                 <span>{t.name}</span>
                 <span className="row gap-s">
+                  {((!t.publicKeyShare && e.status === 'draft') || (e.status === 'closed' && !t.partialDecryptionSubmitted)) && (
+                    <button
+                      type="button"
+                      className="btn btn-small"
+                      disabled={!!busy}
+                      onClick={() => act('invite', async () => setInvite(await api.trusteeInvite(e.id, t.id)))}
+                    >
+                      Cod de acces
+                    </button>
+                  )}
                   {t.publicKeyShare ? <Hash value={t.publicKeyShare} /> : <span className="badge badge-warn">așteaptă cheia</span>}
                   {(e.status === 'closed' || e.status === 'tallied') &&
                     (t.partialDecryptionSubmitted ? <span className="badge badge-ok">decriptare trimisă</span> : <span className="badge badge-warn">așteaptă decriptarea</span>)}
@@ -110,6 +128,7 @@ export function CommissionElection() {
               <Hash value={e.publicKey} head={12} tail={8} />
             </div>
           )}
+          {invite && <InviteBox election={e} invite={invite} onClose={() => setInvite(undefined)} />}
         </div>
 
         <div className="card">
@@ -117,7 +136,7 @@ export function CommissionElection() {
           <ol className="list">
             {e.candidates.map((c) => (
               <li key={c.id}>
-                <strong>{c.name}</strong> <span className="muted">· {c.description}</span>
+                <strong>{c.name}</strong>{c.description && <span className="muted"> · {c.description}</span>}
               </li>
             ))}
           </ol>
@@ -126,16 +145,47 @@ export function CommissionElection() {
 
       {e.status === 'draft' && <EligibleImport election={e} onImported={election.reload} />}
 
-      {mockTools && (
+      {e.status !== 'draft' && (
+        <div className="card">
+          <h3>Ancorarea board-ului</h3>
+          <p className="hint">
+            Publicați acest hash într-un loc independent de server (site-ul facultății, un email către comisie). Verificatorul îl caută în
+            lanț, deci serverul nu mai poate rescrie istoria board-ului fără să fie prins.
+          </p>
+          <div className="kv">
+            <span>Capul lanțului după {e.boardHead.seq} buletine</span>
+            <Hash value={e.boardHead.hash} head={16} tail={12} />
+          </div>
+        </div>
+      )}
+
+      {info.data?.demoMode && (
         <div className="card card-dev">
-          <h3>Unelte de test (doar backend simulat)</h3>
-          <p className="hint">Țin locul CLI-ului de trustee și al alegătorilor până există backend-ul și aplicația mobilă.</p>
+          <h3>Unelte de demo (DEMO_MODE pe server)</h3>
+          <p className="hint">
+            Țin locul alegătorilor și al trustees la prezentare. Cheile trustees simulați stau pe server, exact ce sistemul real nu face: pentru
+            scrutine adevărate folosiți CLI-ul de trustee.
+          </p>
           <div className="row gap-s">
             <button
               type="button"
               className="btn"
+              disabled={!!busy || e.status !== 'draft'}
+              onClick={() =>
+                act('gen', async () => {
+                  const r = await api.demo.generateEligible(e.id, 50)
+                  setDemoCnps((prev) => [...prev, ...r.cnps])
+                  return r.imported
+                }, (n) => `Au fost generate și importate ${n} CNP-uri fictive.`)
+              }
+            >
+              Generează 50 de eligibili
+            </button>
+            <button
+              type="button"
+              className="btn"
               disabled={!!busy || e.status !== 'draft' || keysMissing === 0}
-              onClick={() => act('keys', () => mockTools!.simulateTrusteeKeys(e.id), () => 'Trustees au trimis cheile.')}
+              onClick={() => act('keys', () => api.demo.trusteeKeys(e.id), () => 'Cheile trustees au fost simulate.')}
             >
               Simulează cheile trustees
             </button>
@@ -143,7 +193,7 @@ export function CommissionElection() {
               type="button"
               className="btn"
               disabled={!!busy || e.status !== 'open'}
-              onClick={() => act('voters', () => mockTools!.simulateVoters(e.id, 10), (n) => `Au votat ${n} alegători simulați.`)}
+              onClick={() => act('voters', () => api.demo.voters(e.id, 10), (r) => `Au votat ${(r as { voted: number }).voted} alegători simulați (cu criptare și dovezi reale).`)}
             >
               Simulează 10 alegători
             </button>
@@ -151,11 +201,17 @@ export function CommissionElection() {
               type="button"
               className="btn"
               disabled={!!busy || e.status !== 'closed'}
-              onClick={() => act('tally', () => mockTools!.simulateTally(e.id), () => 'Decriptările parțiale au fost trimise, iar rezultatul e publicat.')}
+              onClick={() => act('tally', () => api.demo.tally(e.id), () => 'Decriptările parțiale au fost trimise, iar rezultatul e publicat.')}
             >
               Simulează decriptarea
             </button>
           </div>
+          {demoCnps.length > 0 && (
+            <details className="mt-s">
+              <summary>CNP-uri fictive generate ({demoCnps.length}), de folosit în aplicația mobilă</summary>
+              <textarea className="input mono" rows={4} readOnly value={demoCnps.join('\n')} />
+            </details>
+          )}
         </div>
       )}
     </>
@@ -180,6 +236,25 @@ function Steps({ election }: { election: Election }) {
         </li>
       ))}
     </ol>
+  )
+}
+
+function InviteBox({ election, invite, onClose }: { election: Election; invite: TrusteeInvite; onClose: () => void }) {
+  const t = election.trustees.find((x) => x.id === invite.trusteeId)
+  const command =
+    election.status === 'draft'
+      ? `npm run trustee -- keygen --server ${apiUrl} --election ${election.id} --trustee ${invite.trusteeId} --code ${invite.code}`
+      : `npm run trustee -- decrypt --server ${apiUrl} --election ${election.id} --trustee ${invite.trusteeId} --code ${invite.code}`
+  return (
+    <div className="alert alert-warn mt-s invite">
+      <div>
+        <strong>Cod de acces pentru {t?.name}</strong> (se afișează o singură dată; se transmite trustee-ului pe un canal sigur):
+        <pre className="mono code">{command}</pre>
+      </div>
+      <button type="button" className="btn btn-small" onClick={onClose}>
+        Ascunde
+      </button>
+    </div>
   )
 }
 

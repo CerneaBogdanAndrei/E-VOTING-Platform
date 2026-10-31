@@ -12,7 +12,9 @@
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router": "^8.4.0"
+    "react-router": "^8.4.0",
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

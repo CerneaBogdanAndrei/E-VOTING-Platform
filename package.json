@@ -2,7 +2,7 @@
   "name": "evoting",
   "version": "1.0.0",
   "private": true,
-  "description": "Sistem de vot electronic verificabil end-to-end (lucrare de licență, UDJG)",
+  "description": "Sistem de vot electronic verificabil end-to-end (lucrare de licen\u021b\u0103, UDJG)",
   "type": "module",
   "engines": {
     "node": ">=22.12"
@@ -23,7 +23,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:backend": "npm run dev -w @evoting/backend",
     "dev:web": "npm run dev -w web",
-    "demo": "node demos/simulate-election.mjs"
+    "demo": "node demos/simulate-election.mjs",
+    "trustee": "node tools/trustee/dist/cli.js",
+    "verify": "node tools/verifier/dist/cli.js"
   },
   "devDependencies": {
     "typescript": "~6.0.3"
