@@ -1,11 +1,17 @@
-/tmp
-/out-tsc
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+.env
+.env.local
+*.log
 
-/node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-/.pnp
-.pnp.js
-
+# IDE
+.idea/
 .vscode/*
+
+# Date locale ale backend-ului (stocarea în fișier, cheile de demo)
+apps/backend/data/
+demos/out/
+tools/trustee/keys/
+*.trustee-key.json

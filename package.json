@@ -1,14 +1,31 @@
 {
-  "name": "Licenta_E-vote",
+  "name": "evoting",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/index.js",
+  "private": true,
+  "description": "Sistem de vot electronic verificabil end-to-end (lucrare de licență, UDJG)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/crypto",
+    "packages/api",
+    "apps/backend",
+    "apps/web",
+    "tools/trustee",
+    "tools/verifier",
+    "demos"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "npm run build -w @evoting/crypto -w @evoting/api && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier",
+    "build:packages": "npm run build -w @evoting/crypto -w @evoting/api",
+    "test": "npm test -w @evoting/crypto -w @evoting/backend",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:backend": "npm run dev -w @evoting/backend",
+    "dev:web": "npm run dev -w web",
+    "demo": "node demos/simulate-election.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^6.0.3"
-  },
-  "private": true
+    "typescript": "~6.0.3"
+  }
 }
