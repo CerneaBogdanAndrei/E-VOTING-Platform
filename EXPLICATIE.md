@@ -559,7 +559,7 @@ Concluzii:
 
 # Partea V: ce rămâne de făcut
 
-1. **Votul cu buletinul propriu în APK:** e nevoie de un buton de test care adaugă CNP-ul citit în lista de eligibili a backend-ului simulat, sau de un server real în a cărui listă e importat CNP-ul.
+1. **Votul cu buletinul propriu în APK:** rezolvat pentru backend-ul simulat. Când înregistrarea (NFC sau OCR) e refuzată cu „CNP-ul nu figurează în lista alegătorilor eligibili”, apare butonul „Test: adaugă CNP-ul meu în lista de eligibili și reîncearcă”. Pe serverul real, CNP-ul trebuie importat de comisie în lista de eligibili.
 2. **Server online:** backend-ul și baza nu sunt găzduite nicăieri. Trebuie un serviciu de găzduire (Render, Railway, un VPS) cu contul tău. Apoi APK-ul se reconstruiește cu `api_url`.
 3. **Certificatul CSCA al României**, pentru Passive Authentication pe documente reale.
 4. **Chip Authentication** (anti-clonare), opțională în plan.

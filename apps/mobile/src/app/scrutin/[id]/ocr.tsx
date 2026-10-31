@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { generateCredential } from '@evoting/crypto'
-import { api, checkCnp, mockTools, parseMrz, type MrzData } from '../../../api'
+import { ApiError, api, checkCnp, mockTools, parseMrz, type MrzData } from '../../../api'
 import { Button, Card, Field, H2, LinkButton, Notice, P, Screen } from '../../../components/ui'
 import { errorMessage } from '../../../lib/format'
 import { ocrModule } from '../../../lib/native'
@@ -23,6 +23,7 @@ export default function OcrScreen() {
   const [cnp, setCnp] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  const [notEligible, setNotEligible] = useState(false)
 
   const readMrz = (text: string) => {
     setMrzText(text)
@@ -59,6 +60,7 @@ export default function OcrScreen() {
   const submit = async () => {
     setBusy(true)
     setError(undefined)
+    setNotEligible(false)
     try {
       // perechea de chei de credential se generează pe telefon; cheia secretă nu pleacă de aici
       const credential = generateCredential()
@@ -67,8 +69,21 @@ export default function OcrScreen() {
       router.dismissTo({ pathname: '/scrutin/[id]', params: { id } })
     } catch (err) {
       setError(errorMessage(err))
+      setNotEligible(err instanceof ApiError && err.status === 403)
       setBusy(false)
     }
+  }
+
+  // Doar cu backend-ul simulat: pune CNP-ul de pe buletinul tău în lista de eligibili și reia înregistrarea.
+  const addSelfAndRetry = async () => {
+    if (!mockTools) return
+    try {
+      await mockTools.addEligibleCnp(id, cnp)
+    } catch (err) {
+      setError(errorMessage(err))
+      return
+    }
+    await submit()
   }
 
   return (
@@ -131,6 +146,7 @@ export default function OcrScreen() {
       {mode !== 'cnp' && mrz && <MrzSummary mrz={mrz} />}
 
       {error && <Notice tone="bad" text={error} />}
+      {notEligible && mockTools && <LinkButton title="Test: adaugă CNP-ul meu în lista de eligibili și reîncearcă" onPress={addSelfAndRetry} />}
       <Button title="Confirmă și înregistrează-te" onPress={submit} disabled={!check.ok || (mode !== 'cnp' && !!mrzBlocks) || (mode !== 'cnp' && !mrz)} loading={busy && mode !== 'camera'} />
       <P muted>
         Telefonul generează o cheie de credential, iar serverul o leagă de amprenta HMAC a CNP-ului, fără să păstreze CNP-ul. Nivel de încredere:
