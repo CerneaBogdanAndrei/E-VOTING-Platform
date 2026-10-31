@@ -1,0 +1,18 @@
+{
+  "name": "@evoting/trustee",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CLI-ul trustee-ului: generează cheia local și face decriptarea parțială cu dovadă",
+  "type": "module",
+  "bin": { "evoting-trustee": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0"
+  },
+  "devDependencies": { "@types/node": "^22.10.0" }
+}

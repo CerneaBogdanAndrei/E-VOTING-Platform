@@ -73,6 +73,18 @@ export interface VerifyOptions {
   yieldEvery?: number
   /** Câte probleme se păstrează per pas (restul se numără). */
   maxProblems?: number
+  /**
+   * Verificator alternativ pentru pasul 3 (de exemplu, în paralel pe mai multe nuclee).
+   * Trebuie să întoarcă aceleași probleme ca verificarea implicită.
+   */
+  proofChecker?: (params: ElectionParams, board: BoardEntry[]) => Promise<string[]>
+}
+
+/** Pasul 3 pentru o porțiune din board (folosit și de verificatorii paraleli). */
+export function checkBallotProofs(params: ElectionParams, entries: BoardEntry[]): string[] {
+  const problems: string[] = []
+  for (const e of entries) for (const p of verifyBallot(params, e.ballot, { checkSignature: false }).problems) problems.push(`Buletinul #${e.seq}: ${p}`)
+  return problems
 }
 
 export async function verifyElectionRecord(record: ElectionRecord, options: VerifyOptions = {}): Promise<VerificationReport> {
@@ -138,12 +150,15 @@ export async function verifyElectionRecord(record: ElectionRecord, options: Veri
 
   // 3. Dovezile ZK
   {
-    const problems: string[] = []
-    for (const [i, e] of board.entries()) {
-      const r = verifyBallot(params, e.ballot, { checkSignature: false })
-      for (const p of r.problems) problems.push(`Buletinul #${e.seq}: ${p}`)
-      options.onProgress?.(i + 1, board.length)
-      if (options.yieldEvery && (i + 1) % options.yieldEvery === 0) await new Promise<void>((res) => setTimeout(() => res(), 0))
+    let problems: string[] = []
+    if (options.proofChecker) {
+      problems = await options.proofChecker(params, board)
+    } else {
+      for (const [i, e] of board.entries()) {
+        problems.push(...checkBallotProofs(params, [e]))
+        options.onProgress?.(i + 1, board.length)
+        if (options.yieldEvery && (i + 1) % options.yieldEvery === 0) await new Promise<void>((res) => setTimeout(() => res(), 0))
+      }
     }
     step('proofs', 'Dovezile zero-knowledge ale buletinelor', problems, `${board.length * (names.length + 1)} dovezi verificate`)
   }

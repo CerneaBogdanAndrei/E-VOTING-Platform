@@ -1,0 +1,19 @@
+{
+  "name": "@evoting/demos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simularea unui scrutin cap-coadă și demonstrațiile de atac din lucrare",
+  "type": "module",
+  "scripts": {
+    "simulate": "node simulate-election.mjs",
+    "attack:cnp": "node attacks/1-cnp-sha256-vs-hmac.mjs",
+    "attack:deterministic": "node attacks/2-deterministic-encryption.mjs",
+    "attack:bsgs": "node attacks/3-bsgs-vs-private-key.mjs",
+    "attack:api": "node attacks/4-api-brute-force.mjs",
+    "attack:tamper": "node attacks/5-tamper-board.mjs"
+  },
+  "dependencies": {
+    "@evoting/api": "1.0.0",
+    "@evoting/crypto": "1.0.0"
+  }
+}
