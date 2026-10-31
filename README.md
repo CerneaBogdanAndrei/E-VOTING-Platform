@@ -8,6 +8,8 @@ Sistem de vot online în care fiecare alegător își poate verifica votul, iar 
 
 **Documentația completă, pas cu pas: [DOCUMENTATIE.md](DOCUMENTATIE.md). Explicația fiecărui fișier și a tot ce s-a construit: [EXPLICATIE.md](EXPLICATIE.md).**
 
+**Totul explicat de la zero, cuvânt cu cuvânt, pentru cine n-a mai văzut codul: [explicatii/](explicatii/README.md).**
+
 ## Structura
 
 | Folder | Ce conține |
