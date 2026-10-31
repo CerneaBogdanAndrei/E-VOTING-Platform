@@ -2,8 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { generateCredential } from '@evoting/crypto'
-import { api, bytesToBase64, dg1FromMrz, mockTools } from '../../../api'
-import { Button, Card, Field, H2, Notice, Screen } from '../../../components/ui'
+import { ApiError, api, base64ToBytes, bytesToBase64, dg1FromMrz, mockTools, mrzFromDg1, parseMrz } from '../../../api'
+import { Button, Card, Field, H2, LinkButton, Notice, Screen } from '../../../components/ui'
 import { errorMessage } from '../../../lib/format'
 import { nfcModule } from '../../../lib/native'
 import { useSession } from '../../../lib/session'
@@ -22,8 +22,13 @@ export default function NfcScreen() {
   const [can, setCan] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  /** Cipul citit, păstrat ca înregistrarea să poată fi reluată după adăugarea în lista de test. */
+  const [lastRead, setLastRead] = useState<{ dg1: string; sod: string }>()
+  const [notEligible, setNotEligible] = useState(false)
 
   const register = async (dg1: string, sod: string) => {
+    setLastRead({ dg1, sod })
+    setNotEligible(false)
     const credential = generateCredential()
     const registration = await api.registerNfc(id, { dg1, sod, credentialPubkey: credential.publicKey })
     update({ credential, registration })
@@ -40,8 +45,28 @@ export default function NfcScreen() {
       const { dg1, sod } = await nfcModule.readDocument(can)
       await register(dg1, sod)
     } catch (err) {
-      setError(errorMessage(err))
-      setBusy(false)
+      fail(err)
+    }
+  }
+
+  const fail = (err: unknown) => {
+    setError(errorMessage(err))
+    setNotEligible(err instanceof ApiError && err.status === 403)
+    setBusy(false)
+  }
+
+  // Doar cu backend-ul simulat: pune CNP-ul de pe buletinul tău în lista de eligibili și reia înregistrarea.
+  const addSelfAndRetry = async () => {
+    if (!mockTools || !lastRead) return
+    setBusy(true)
+    setError(undefined)
+    try {
+      const cnp = parseMrz(mrzFromDg1(base64ToBytes(lastRead.dg1)))?.cnp
+      if (!cnp) throw new Error('DG1 nu conține un MRZ valid cu CNP')
+      await mockTools.addEligibleCnp(id, cnp)
+      await register(lastRead.dg1, lastRead.sod)
+    } catch (err) {
+      fail(err)
     }
   }
 
@@ -55,8 +80,7 @@ export default function NfcScreen() {
       if (!mrz) throw new Error('Nu mai există CNP-uri de test neînregistrate la acest scrutin.')
       await register(bytesToBase64(dg1FromMrz(mrz)), '')
     } catch (err) {
-      setError(errorMessage(err))
-      setBusy(false)
+      fail(err)
     }
   }
 
@@ -84,6 +108,9 @@ export default function NfcScreen() {
       />
 
       {error && <Notice tone="bad" text={error} />}
+      {notEligible && mockTools && lastRead && (
+        <LinkButton title="Test: adaugă CNP-ul meu în lista de eligibili și reîncearcă" onPress={addSelfAndRetry} />
+      )}
       {nfcModule?.isSupported() ? (
         <Button title={busy ? 'Ține telefonul lângă buletin…' : 'Citește cipul'} onPress={read} disabled={can.length !== 6} loading={busy} />
       ) : mockTools ? (

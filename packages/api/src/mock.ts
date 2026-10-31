@@ -72,6 +72,11 @@ export interface MockTools {
   simulateVoters(electionId: string, n: number): Promise<number>
   /** Trustees trimit decriptările parțiale, iar rezultatul se publică. */
   simulateTally(electionId: string): Promise<Election>
+  /**
+   * Adaugă un CNP real (citit de pe buletinul tău) în lista de eligibili, ca să poți
+   * vota cu propriul document pe backend-ul simulat. Pe serverul real lista se importă de comisie.
+   */
+  addEligibleCnp(electionId: string, cnp: string): Promise<void>
 }
 
 const randomToken = () => bytesToHex(crypto.getRandomValues(new Uint8Array(24)))
@@ -569,6 +574,17 @@ export function createMockBackend(options: MockOptions = {}): { client: ApiClien
         if (s.data.status !== 'closed') throw new ApiError(409, 'Numărarea începe după închiderea votului')
         simulateTallyNow(s)
         return snapshot(s)
+      }),
+    addEligibleCnp: (id, cnp) =>
+      run(() => {
+        const s = get(id)
+        if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Înregistrarea s-a închis pentru acest scrutin')
+        if (!isValidCnp(cnp)) throw new ApiError(400, 'CNP invalid')
+        // doar HMAC-ul; nu intră în testCnps, ca simularea alegătorilor să nu-l folosească
+        if (!s.eligible.has(hmac(cnp))) {
+          s.eligible.add(hmac(cnp))
+          log(s, 'comisie', 'eligible.import', { imported: 1, duplicates: 0, invalid: 0 })
+        }
       }),
   }
 
