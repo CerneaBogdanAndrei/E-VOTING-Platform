@@ -6,7 +6,7 @@ Sistem de vot online în care fiecare alegător își poate verifica votul, iar 
 - **Identitate:** înregistrare cu buletinul, prin OCR pe zona MRZ sau prin NFC pe CEI, cu Passive Authentication. Serverul păstrează doar `HMAC(k, CNP)`.
 - **Verificare:** cod de urmărire pentru fiecare alegător, provocarea Benaloh și un verificator public (în browser și CLI) care reface toate dovezile.
 
-**Documentația completă, pas cu pas: [DOCUMENTATIE.md](DOCUMENTATIE.md).**
+**Documentația completă, pas cu pas: [DOCUMENTATIE.md](DOCUMENTATIE.md). Explicația fiecărui fișier și a tot ce s-a construit: [EXPLICATIE.md](EXPLICATIE.md).**
 
 ## Structura
 
