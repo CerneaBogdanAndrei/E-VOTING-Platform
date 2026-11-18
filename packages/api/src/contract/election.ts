@@ -76,3 +76,16 @@ export interface EligibleImportResult {
   duplicates: number
   invalid: { line: number; value: string }[]
 }
+
+/** Rezultatul scoaterii unor CNP-uri din lista de eligibili (de exemplu, o persoană adăugată din greșeală). */
+export interface EligibleRemoveResult {
+  /** Câte CNP-uri au fost scoase din listă. */
+  removed: number
+  /** Câte dintre ele aveau deja un credential înregistrat: înregistrarea e ștearsă și ea, deci persoana nu mai poate vota. */
+  registrationsRemoved: number
+  /** CNP-uri valide care nu erau în listă. */
+  notFound: number
+  /** CNP-uri păstrate pentru că persoana a votat deja: un vot de pe board nu se mai scoate. */
+  voted: number
+  invalid: { line: number; value: string }[]
+}

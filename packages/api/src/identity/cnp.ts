@@ -41,6 +41,23 @@ export function isValidCnp(value: string): boolean {
   return checkCnp(value).ok
 }
 
+/**
+ * O listă de CNP-uri ca CSV: un CNP pe linie (prima coloană, separată prin virgulă sau punct și virgulă,
+ * eventual între ghilimele); liniile goale și antetul „cnp” de pe prima linie se sar. Folosită la importul
+ * și la scoaterea eligibililor, identic pe serverul real și pe cel simulat.
+ */
+export function parseCnpList(csv: string): { valid: string[]; invalid: { line: number; value: string }[] } {
+  const valid: string[] = []
+  const invalid: { line: number; value: string }[] = []
+  for (const [i, raw] of csv.split(/\r?\n/).entries()) {
+    const value = raw.split(/[,;]/)[0].trim().replace(/^"|"$/g, '')
+    if (!value || (i === 0 && /^cnp$/i.test(value))) continue
+    if (isValidCnp(value)) valid.push(value)
+    else invalid.push({ line: i + 1, value })
+  }
+  return { valid, invalid }
+}
+
 const pad = (n: number, width: number) => String(n).padStart(width, '0')
 
 /** CNP fictiv, dar valid ca format, pentru o persoană născută între 2000 și 2007. */

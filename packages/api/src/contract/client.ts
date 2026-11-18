@@ -4,7 +4,7 @@
 import type { Ballot, BoardEntry, PartialDecryption, TrusteePublicKey } from '@evoting/crypto'
 import type { AdminIdentity, CommissionMember, CreateMemberInput, CreatedMember } from './admin.js'
 import type { AuditBundleResponse, AuditLogEntry, BoardHead, BoardPage, ElectionResult, TallyInfo } from './board.js'
-import type { CreateElectionInput, CreatedElection, Election, EligibleImportResult, UpdateElectionInput } from './election.js'
+import type { CreateElectionInput, CreatedElection, Election, EligibleImportResult, EligibleRemoveResult, UpdateElectionInput } from './election.js'
 import type { AuthChallenge, AuthSession, BallotReceipt, PublicRegistration, RegisterNfcInput, RegisterOcrInput, Registration } from './voter.js'
 
 export interface ApiClient {
@@ -32,6 +32,8 @@ export interface ApiClient {
   deleteElection(id: string): Promise<void>
   /** În `draft` sau `open`. */
   importEligible(id: string, csv: string): Promise<EligibleImportResult>
+  /** În `draft` sau `open`: scoate CNP-urile din listă (și înregistrarea lor, dacă n-au votat). */
+  removeEligible(id: string, csv: string): Promise<EligibleRemoveResult>
   openElection(id: string): Promise<Election>
   closeElection(id: string): Promise<Election>
   getAuditLog(id: string): Promise<AuditLogEntry[]>

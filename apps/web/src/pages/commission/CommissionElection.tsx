@@ -2,12 +2,13 @@
 // candidații, importul eligibililor, hash-ul de publicat independent și jurnalul.
 // Bucățile mari sunt în ./parts.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api, mockTools, type TrusteeToken } from '../../api'
 import { canEdit, useAdmin } from '../../api/admin'
 import { Countdown, ErrorBox, Hash, Loading, Message, Stat, StatusBadge, type MessageKind } from '../../components/ui'
 import { candidateLabel, formatInterval, percent, plural } from '../../lib/format'
+import { forgetTrusteeTokens, loadTrusteeTokens, saveTrusteeTokens } from '../../lib/trusteeTokens'
 import { useAsync } from '../../lib/useAsync'
 import { AuditLog } from './parts/AuditLog'
 import { BoardHead } from './parts/BoardHead'
@@ -25,7 +26,20 @@ export function CommissionElection() {
   const navigate = useNavigate()
   const election = useAsync(() => api.getElection(id), [id])
   const location = useLocation()
-  const trusteeTokens = (location.state as { trusteeTokens?: TrusteeToken[] } | null)?.trusteeTokens
+  const fromCreate = (location.state as { trusteeTokens?: TrusteeToken[] } | null)?.trusteeTokens
+  // token-urile vin o singură dată, de la pagina de creare; rămân în acest tab până la „Am transmis”
+  const [trusteeTokens, setTrusteeTokens] = useState<TrusteeToken[] | undefined>(() => {
+    if (fromCreate) saveTrusteeTokens(id, fromCreate)
+    return fromCreate ?? loadTrusteeTokens(id)
+  })
+  useEffect(() => {
+    // scoase din istoricul browserului: altfel ar reapărea după „Am transmis” la o reîncărcare
+    if (fromCreate) navigate(location.pathname, { replace: true, state: null })
+  }, [fromCreate, location.pathname, navigate])
+  const forgetTokens = () => {
+    forgetTrusteeTokens(id)
+    setTrusteeTokens(undefined)
+  }
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ kind: MessageKind; text: string }>()
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -155,7 +169,7 @@ export function CommissionElection() {
 
       <Steps election={e} />
 
-      {trusteeTokens && e.status === 'draft' && <TrusteeTokens election={e} tokens={trusteeTokens} />}
+      {trusteeTokens && <TrusteeTokens election={e} tokens={trusteeTokens} onDone={forgetTokens} />}
 
       <div className="stats">
         <Stat label="Eligibili" value={e.stats.eligible} />

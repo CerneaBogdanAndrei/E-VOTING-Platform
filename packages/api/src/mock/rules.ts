@@ -19,13 +19,14 @@ import {
 import {
   ApiError,
   type EligibleImportResult,
+  type EligibleRemoveResult,
   type Registration,
   type RegistrationMethod,
   type TrustLevel,
   type UpdateElectionInput,
 } from '../contract/index.js'
 import { plural } from '../format.js'
-import { isValidCnp } from '../identity/cnp.js'
+import { isValidCnp, parseCnpList } from '../identity/cnp.js'
 import { electionParams, prepareBallot } from '../voter.js'
 import { pickWeighted } from './random.js'
 import { buildCandidates, type ElectionState, type MockContext } from './state.js'
@@ -126,14 +127,9 @@ export function addEligible(ctx: MockContext, s: ElectionState, cnps: string[]) 
 /** CSV cu un CNP pe linie, ca la serverul real: se păstrează HMAC-ul (și, doar aici, CNP-ul pentru uneltele de test). */
 export function importCsv(ctx: MockContext, s: ElectionState, csv: string): EligibleImportResult {
   if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Lista se poate completa doar înainte de închiderea votului')
-  const result: EligibleImportResult = { imported: 0, duplicates: 0, invalid: [] }
-  for (const [i, raw] of csv.split(/\r?\n/).entries()) {
-    const value = raw.split(/[,;]/)[0].trim().replace(/^"|"$/g, '')
-    if (!value || (i === 0 && /^cnp$/i.test(value))) continue
-    if (!isValidCnp(value)) {
-      result.invalid.push({ line: i + 1, value })
-      continue
-    }
+  const { valid, invalid } = parseCnpList(csv)
+  const result: EligibleImportResult = { imported: 0, duplicates: 0, invalid }
+  for (const value of valid) {
     const h = ctx.hmac(value)
     if (s.eligible.has(h)) {
       result.duplicates++
@@ -144,6 +140,34 @@ export function importCsv(ctx: MockContext, s: ElectionState, csv: string): Elig
     result.imported++
   }
   ctx.log(s, 'comisie', 'eligible.import', { imported: result.imported, duplicates: result.duplicates, invalid: result.invalid.length })
+  return result
+}
+
+/** Scoaterea din listă, ca la serverul real: cine s-a înregistrat și n-a votat își pierde și înregistrarea; cine a votat rămâne. */
+export function removeCsv(ctx: MockContext, s: ElectionState, csv: string): EligibleRemoveResult {
+  if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Lista se poate modifica doar înainte de închiderea votului')
+  const { valid, invalid } = parseCnpList(csv)
+  const result: EligibleRemoveResult = { removed: 0, registrationsRemoved: 0, notFound: 0, voted: 0, invalid }
+  for (const cnp of new Set(valid)) {
+    const h = ctx.hmac(cnp)
+    const credential = s.registeredHmacs.get(h)
+    if (credential && s.board.some((e) => e.credentialPubkey === credential)) {
+      result.voted++
+      continue
+    }
+    if (!s.eligible.delete(h)) {
+      result.notFound++
+      continue
+    }
+    if (credential) {
+      s.registeredHmacs.delete(h)
+      s.registrations.delete(credential)
+      result.registrationsRemoved++
+    }
+    s.testCnps = s.testCnps.filter((x) => x !== cnp)
+    result.removed++
+  }
+  ctx.log(s, 'comisie', 'eligible.remove', { ...result, invalid: invalid.length })
   return result
 }
 

@@ -1,9 +1,9 @@
 // Acțiunile comisiei asupra unui scrutin: creare, modificare și ștergere (în configurare),
-// importul eligibililor, deschiderea și închiderea votului (cu publicarea agregatului).
+// importul și scoaterea eligibililor, deschiderea și închiderea votului (cu publicarea agregatului).
 
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common'
 import {
-  isValidCnp,
+  parseCnpList,
   plural,
   type AdminIdentity,
   type BoardEntry,
@@ -11,6 +11,7 @@ import {
   type CreatedElection,
   type Election,
   type EligibleImportResult,
+  type EligibleRemoveResult,
   type UpdateElectionInput,
 } from '@evoting/api'
 import { cnpHmac, computeAggregate } from '@evoting/crypto'
@@ -142,23 +143,25 @@ export class ElectionsService {
     })
   }
 
-  /** CSV cu un CNP pe linie. CNP-urile în clar nu se salvează și nu se loghează: intră doar HMAC-ul. */
-  async importEligible(id: string, csv: unknown, by: AdminIdentity): Promise<EligibleImportResult> {
+  /**
+   * CSV-ul cu CNP-uri transformat în HMAC-uri. CNP-urile în clar nu se salvează și nu se loghează;
+   * pentru liniile invalide, în răspuns apare doar numărul liniei și o mască, ca un CNP greșit să nu ajungă în loguri.
+   */
+  private hmacsFromCsv(csv: unknown): { hmacs: string[]; invalid: { line: number; value: string }[] } {
     if (typeof csv !== 'string') throw bad('Se așteaptă un fișier CSV (Content-Type: text/csv)')
-    const result: EligibleImportResult = { imported: 0, duplicates: 0, invalid: [] }
-    const hmacs: string[] = []
-    for (const [i, raw] of csv.split(/\r?\n/).entries()) {
-      const value = raw.split(/[,;]/)[0].trim().replace(/^"|"$/g, '')
-      if (!value || (i === 0 && /^cnp$/i.test(value))) continue
-      if (!isValidCnp(value)) {
-        // în răspuns apare doar numărul liniei și o mască, ca un CNP greșit să nu ajungă în loguri
-        if (result.invalid.length < MAX_INVALID_REPORTED) {
-          result.invalid.push({ line: i + 1, value: value.length > 4 ? `${value.slice(0, 2)}…${value.slice(-2)}` : '…' })
-        }
-        continue
-      }
-      hmacs.push(cnpHmac(this.config.cnpHmacKey, value))
+    const { valid, invalid } = parseCnpList(csv)
+    return {
+      hmacs: valid.map((cnp) => cnpHmac(this.config.cnpHmacKey, cnp)),
+      invalid: invalid
+        .slice(0, MAX_INVALID_REPORTED)
+        .map(({ line, value }) => ({ line, value: value.length > 4 ? `${value.slice(0, 2)}…${value.slice(-2)}` : '…' })),
     }
+  }
+
+  /** CSV cu un CNP pe linie; în bază intră doar HMAC(CNP). */
+  async importEligible(id: string, csv: unknown, by: AdminIdentity): Promise<EligibleImportResult> {
+    const { hmacs, invalid } = this.hmacsFromCsv(csv)
+    const result: EligibleImportResult = { imported: 0, duplicates: 0, invalid }
     await this.db.transaction(async (client) => {
       const e = await this.elections.lock(client, id)
       if (e.status !== 'draft' && e.status !== 'open') throw new ConflictException('Lista se poate completa doar înainte de închiderea votului')
@@ -180,6 +183,43 @@ export class ElectionsService {
         { imported: result.imported, duplicates: result.duplicates, invalid: result.invalid.length },
         client,
       )
+    })
+    return result
+  }
+
+  /**
+   * Scoate CNP-uri din listă (o persoană adăugată din greșeală, un student retras), în configurare sau
+   * cu votul deschis. Dacă persoana s-a înregistrat, dar n-a votat, înregistrarea (și provocările ei) se șterg
+   * și ele, deci credentialul nu mai poate vota. Cine a votat deja rămâne: votul de pe board nu se scoate.
+   */
+  async removeEligible(id: string, csv: unknown, by: AdminIdentity): Promise<EligibleRemoveResult> {
+    const { hmacs, invalid } = this.hmacsFromCsv(csv)
+    const unique = [...new Set(hmacs)]
+    const result: EligibleRemoveResult = { removed: 0, registrationsRemoved: 0, notFound: 0, voted: 0, invalid }
+    await this.db.transaction(async (client) => {
+      const e = await this.elections.lock(client, id)
+      if (e.status !== 'draft' && e.status !== 'open') throw new ConflictException('Lista se poate modifica doar înainte de închiderea votului')
+      const voted = await client.query<{ cnp_hmac: string }>(
+        `SELECT r.cnp_hmac FROM registrations r
+         JOIN ballots b ON b.election_id = r.election_id AND b.credential_pubkey = r.credential_pubkey
+         WHERE r.election_id = $1 AND r.cnp_hmac = ANY($2::text[])`,
+        [id, unique],
+      )
+      const keep = new Set(voted.rows.map((r) => r.cnp_hmac))
+      const remove = unique.filter((h) => !keep.has(h))
+      await client.query(
+        `DELETE FROM auth_challenges c USING registrations r
+         WHERE c.election_id = $1 AND r.election_id = $1 AND r.credential_pubkey = c.credential_pubkey AND r.cnp_hmac = ANY($2::text[])`,
+        [id, remove],
+      )
+      const regs = await client.query('DELETE FROM registrations WHERE election_id = $1 AND cnp_hmac = ANY($2::text[])', [id, remove])
+      const removed = await client.query('DELETE FROM eligible_voters WHERE election_id = $1 AND cnp_hmac = ANY($2::text[])', [id, remove])
+      result.voted = keep.size
+      result.registrationsRemoved = regs.rowCount ?? 0
+      result.removed = removed.rowCount ?? 0
+      result.notFound = remove.length - result.removed
+      // în jurnal: doar numerele, niciun CNP sau HMAC
+      await this.audit.log(adminActor(by), 'eligible.remove', id, { ...result, invalid: invalid.length }, client)
     })
     return result
   }

@@ -12,6 +12,7 @@ import {
   close,
   deleteElection,
   importCsv,
+  removeCsv,
   openElection,
   register,
   submitKey,
@@ -98,6 +99,7 @@ export function createMockClient(ctx: MockContext, run: Run): ApiClient {
       }),
     deleteElection: (id) => run(() => deleteElection(ctx, ctx.get(id))),
     importEligible: (id, csv) => run(() => importCsv(ctx, ctx.get(id), csv)),
+    removeEligible: (id, csv) => run(() => removeCsv(ctx, ctx.get(id), csv)),
     openElection: (id) =>
       run(() => {
         const s = ctx.get(id)

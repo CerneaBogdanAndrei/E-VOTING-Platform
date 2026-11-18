@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, type Election } from '../../../api'
 import { ErrorBox } from '../../../components/ui'
+import { plural } from '../../../lib/format'
 import { useAsync } from '../../../lib/useAsync'
 
 const ACTIONS: Record<string, string> = {
@@ -8,6 +9,7 @@ const ACTIONS: Record<string, string> = {
   'election.update': 'Scrutin modificat',
   'election.delete': 'Scrutin șters',
   'eligible.import': 'Listă de eligibili importată',
+  'eligible.remove': 'CNP-uri scoase din lista de eligibili',
   'trustee.key': 'Cheie de trustee primită',
   'election.public_key': 'Cheia scrutinului publicată',
   'election.open': 'Vot deschis',
@@ -18,6 +20,15 @@ const ACTIONS: Record<string, string> = {
   'tally.result': 'Rezultat publicat',
   'member.create': 'Membru al comisiei creat',
   'member.revoke': 'Membru al comisiei revocat',
+}
+
+/** „2 scoși, 1 cu înregistrarea ștearsă”: ce a făcut o scoatere din listă, doar ca numere. */
+function removedSummary(payload: unknown) {
+  const p = (payload ?? {}) as { removed?: number; registrationsRemoved?: number; voted?: number }
+  const parts = [plural(p.removed ?? 0, 'scos', 'scoși')]
+  if (p.registrationsRemoved) parts.push(`${p.registrationsRemoved} cu înregistrarea ștearsă`)
+  if (p.voted) parts.push(`${plural(p.voted, 'păstrat', 'păstrați')} (${p.voted === 1 ? 'a votat' : 'au votat'})`)
+  return parts.join(', ')
 }
 
 /** Jurnalul de audit al scrutinului (pentru comisie și observatori). Înregistrările alegătorilor sunt doar numărate. */
@@ -45,6 +56,7 @@ export function AuditLog({ election }: { election: Election }) {
                 {x.action === 'election.close' && (x.payload as { automatic?: boolean } | null)?.automatic && (
                   <span className="muted small"> (automat, la ora închiderii)</span>
                 )}
+                {x.action === 'eligible.remove' && <span className="muted small"> ({removedSummary(x.payload)})</span>}
               </span>
               <span className="muted small">{x.actor}</span>
             </li>

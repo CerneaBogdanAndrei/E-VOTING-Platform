@@ -159,6 +159,25 @@ describe('backend-ul simulat, cu criptografie reală', () => {
     await assert.rejects(api.getElection(draft.id), status(404))
   })
 
+  it('scoaterea din lista de eligibili: ca pe serverul real (înregistrarea nevotată dispare, votul rămâne)', { timeout: 60_000 }, async () => {
+    const { client: api, tools } = createMockBackend({ latency: false, seedVoters: { open: 1, tallied: 1 } })
+    const { election } = await api.createElection(input())
+    await tools.simulateTrusteeKeys(election.id)
+    await api.importEligible(election.id, '5040312170018\n6050101400015\n1960101400011')
+    const opened = await api.openElection(election.id)
+    const voter = generateCredential()
+    const waiting = generateCredential()
+    await api.registerOcr(election.id, { cnp: '5040312170018', credentialPubkey: voter.publicKey })
+    await api.registerOcr(election.id, { cnp: '6050101400015', credentialPubkey: waiting.publicKey })
+    await submitBallot(api, opened, voter, prepareBallot(opened, voter, 0))
+    const result = await api.removeEligible(election.id, '5040312170018\n6050101400015\n1960101400011\n2900101400014\n123')
+    assert.deepEqual({ ...result, invalid: result.invalid.length }, { removed: 2, registrationsRemoved: 1, notFound: 1, voted: 1, invalid: 1 })
+    assert.deepEqual((await api.getElection(election.id)).stats, { eligible: 1, registered: 1, ballots: 1 })
+    await assert.rejects(submitBallot(api, opened, waiting, prepareBallot(opened, waiting, 1)), status(403))
+    await api.closeElection(election.id)
+    await assert.rejects(api.removeEligible(election.id, '5040312170018'), status(409))
+  })
+
   it('votul e refuzat în afara intervalului, iar la closesAt serverul închide singur', { timeout: 60_000 }, async () => {
     const { client: api, tools } = createMockBackend({ latency: false, seedVoters: { open: 1, tallied: 1 } })
     const { election } = await api.createElection(input({ closesAt: new Date(Date.now() + 1200).toISOString() }))
