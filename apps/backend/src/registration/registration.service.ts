@@ -75,6 +75,8 @@ export class RegistrationService {
     return this.db.transaction(async (client) => {
       const e = await this.elections.lock(client, electionId)
       if (e.status !== 'draft' && e.status !== 'open') throw new ConflictException('Înregistrarea s-a închis pentru acest scrutin')
+      // scrutin „doar NFC”: un MRZ citit optic (care poate fi și printat) nu ajunge
+      if (e.require_nfc && method !== 'nfc') throw new ForbiddenException('Acest scrutin acceptă doar înregistrarea cu cartea electronică (NFC)')
       const eligible = await client.query('SELECT 1 FROM eligible_voters WHERE election_id = $1 AND cnp_hmac = $2', [electionId, hmac])
       if (!eligible.rowCount) throw new ForbiddenException('CNP-ul nu figurează în lista alegătorilor eligibili')
 

@@ -115,6 +115,7 @@ export function createMockContext(): MockContext {
           opensAt: input.opensAt,
           closesAt: input.closesAt,
           publicKey: null,
+          requireNfc: input.requireNfc === true,
           candidates: buildCandidates(id, input.candidates, input.allowBlank),
           trustees: input.trustees.map((t, i) => ({
             id: `${id}-t${i + 1}`,

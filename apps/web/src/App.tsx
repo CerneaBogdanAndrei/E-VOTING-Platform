@@ -8,6 +8,7 @@ import { CommissionList } from './pages/commission/CommissionList'
 import { CommissionMembers } from './pages/commission/CommissionMembers'
 import { CommissionNew } from './pages/commission/CommissionNew'
 import { ElectionPublic } from './pages/election/ElectionPublic'
+import { ProcesVerbal } from './pages/election/ProcesVerbal'
 import { Home } from './pages/Home'
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="scrutin/:id" element={<ElectionPublic />} />
+        <Route path="scrutin/:id/proces-verbal" element={<ProcesVerbal />} />
         <Route
           path="comisie"
           element={

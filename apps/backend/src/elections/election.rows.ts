@@ -10,6 +10,7 @@ export interface ElectionRow {
   opens_at: Date
   closes_at: Date
   public_key: string | null
+  require_nfc: boolean
   aggregate: TallyInfo['aggregate']
   eligible: string
   registered: string
@@ -58,7 +59,7 @@ export interface ResultRow {
 
 /** Scrutinul cu statisticile lui, calculate în aceeași interogare. */
 export const ELECTION_SELECT = `
-  SELECT e.id, e.title, e.status, e.opens_at, e.closes_at, e.public_key, e.aggregate,
+  SELECT e.id, e.title, e.status, e.opens_at, e.closes_at, e.public_key, e.require_nfc, e.aggregate,
     (SELECT count(*) FROM eligible_voters v WHERE v.election_id = e.id) AS eligible,
     (SELECT count(*) FROM registrations r WHERE r.election_id = e.id) AS registered,
     (SELECT count(*) FROM ballots b WHERE b.election_id = e.id) AS ballots

@@ -178,6 +178,23 @@ describe('backend-ul simulat, cu criptografie reală', () => {
     await assert.rejects(api.removeEligible(election.id, '5040312170018'), status(409))
   })
 
+  it('scrutinul „doar NFC”: OCR-ul refuzat, NFC acceptat, alegătorii simulați trec prin NFC', { timeout: 60_000 }, async () => {
+    const { client: api, tools } = createMockBackend({ latency: false, seedVoters: { open: 1, tallied: 1 } })
+    const { election } = await api.createElection(input({ requireNfc: true }))
+    assert.equal(election.requireNfc, true)
+    await tools.simulateTrusteeKeys(election.id)
+    await api.importEligible(election.id, '5040312170018\n6050101400015\n1960101400011')
+    await api.openElection(election.id)
+    await assert.rejects(api.registerOcr(election.id, { cnp: '5040312170018', credentialPubkey: generateCredential().publicKey }), status(403))
+    const dg1 = dg1FromMrz(buildTd1({ surname: 'Ion', givenNames: 'Ana', documentNumber: 'GL1', cnp: '6050101400015', sex: 'F', expiry: '330101' }))
+    const reg = await api.registerNfc(election.id, { dg1: bytesToBase64(dg1), sod: '', credentialPubkey: generateCredential().publicKey })
+    assert.equal(reg.trustLevel, 'criptografic')
+    assert.equal(await tools.simulateVoters(election.id, 2), 2)
+    const regs = await api.getRegistrations(election.id)
+    assert.equal(regs.length, 3)
+    assert.ok(regs.every((r) => r.method === 'nfc'))
+  })
+
   it('votul e refuzat în afara intervalului, iar la closesAt serverul închide singur', { timeout: 60_000 }, async () => {
     const { client: api, tools } = createMockBackend({ latency: false, seedVoters: { open: 1, tallied: 1 } })
     const { election } = await api.createElection(input({ closesAt: new Date(Date.now() + 1200).toISOString() }))

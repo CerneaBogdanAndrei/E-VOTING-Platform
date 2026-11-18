@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { STEP_TITLES, verifyElection, type StepId, type VerificationReport } from '@evoting/crypto'
 import { api, apiMode, type Election } from '../../../api'
+import { decimal } from '../../../lib/format'
 import { browserThreads, createBrowserWork, workersAvailable } from '../../../lib/verify-workers'
 
 const THREADS = browserThreads()
@@ -109,7 +110,7 @@ export function VerificationTab({ election }: { election: Election }) {
         <>
           <div role="alert" className={`alert ${report.ok ? 'alert-ok' : 'alert-bad'}`}>
             {report.ok
-              ? `Toate verificările trec (${report.ballots} buletine, ${(elapsed / 1000).toFixed(1)} s, ${usedThreads === 1 ? 'pe un fir' : `pe ${usedThreads} fire`}).`
+              ? `Toate verificările trec (${report.ballots} buletine, ${decimal(elapsed / 1000)} s, ${usedThreads === 1 ? 'pe un fir' : `pe ${usedThreads} fire`}).`
               : 'Verificarea a picat: rezultatul nu este de încredere. Detaliile arată exact unde.'}
           </div>
           <ol className="report">

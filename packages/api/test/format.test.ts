@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { formatDuration, intervalPhase, plural } from '../src/index.js'
+import { decimal, formatDuration, intervalPhase, percent, plural } from '../src/index.js'
 
 const MIN = 60_000
 const HOUR = 60 * MIN
@@ -28,6 +28,15 @@ describe('formatări în română', () => {
     assert.equal(formatDuration(21 * HOUR), '21 de ore')
     assert.equal(formatDuration(2 * DAY + 3 * HOUR + 10 * MIN), '2 zile și 3 ore')
     assert.equal(formatDuration(25 * DAY), '25 de zile')
+  })
+
+  it('procente și zecimale cu virgulă, ca în română', () => {
+    assert.equal(percent(582, 1000), '58,2%')
+    assert.equal(percent(3, 5), '60%')
+    assert.equal(percent(1, 3), '33,3%')
+    assert.equal(percent(0, 0), '0%')
+    assert.equal(decimal(4.44), '4,4')
+    assert.equal(decimal(30.2, 2), '30,20')
   })
 
   it('faza intervalului: înainte, în timpul și după, cu marginile incluse', () => {

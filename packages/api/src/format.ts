@@ -41,7 +41,11 @@ export const shortHash = (hex: string, head = 8, tail = 6) => (hex.length <= hea
 /** Codul de urmărire în grupuri de câte 8 caractere, mai ușor de citit și comparat. */
 export const groupHash = (hex: string) => hex.match(/.{1,8}/g)?.join(' ') ?? hex
 
-export const percent = (part: number, whole: number) => (whole === 0 ? '0%' : `${Math.round((part / whole) * 1000) / 10}%`)
+/** Numărul cu virgulă zecimală, ca în română: 58,2 (nu 58.2). */
+export const decimal = (value: number, digits = 1) => value.toFixed(digits).replace('.', ',')
+
+/** „58,2%”: procentul rotunjit la o zecimală, cu virgulă; fără zecimale când e întreg („60%”). */
+export const percent = (part: number, whole: number) => (whole === 0 ? '0%' : `${String(Math.round((part / whole) * 1000) / 10).replace('.', ',')}%`)
 
 export const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
 

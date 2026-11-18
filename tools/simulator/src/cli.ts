@@ -12,7 +12,7 @@
 
 import { writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { authenticate, createHttpClient, prepareBallot, type Election } from '@evoting/api'
+import { authenticate, createHttpClient, decimal, prepareBallot, type Election } from '@evoting/api'
 import { generateCredential, generateTrusteeKey, partialDecrypt, verifyElection, type TrusteeKeyPair } from '@evoting/crypto'
 import { createNodeWork, defaultThreads } from '@evoting/crypto/node'
 import { stats, timed } from './lib/metrics.js'
@@ -126,7 +126,7 @@ async function main() {
   )
   const voteTotal = performance.now() - tVote
   if (process.stdout.isTTY) process.stdout.write('\r')
-  ok(`${N} buletine pe board în ${(voteTotal / 1000).toFixed(1)} s (${(N / (voteTotal / 1000)).toFixed(1)} buletine/s), ${nfcCount} prin NFC`)
+  ok(`${N} buletine pe board în ${decimal(voteTotal / 1000)} s (${decimal(N / (voteTotal / 1000))} buletine/s), ${nfcCount} prin NFC`)
   metrics.encryptAndProveMs = stats(encryptMs)
   metrics.castRoundtripMs = stats(castMs)
   metrics.registerRoundtripMs = stats(registerMs)
@@ -160,7 +160,7 @@ async function main() {
   const [bundle, downloadMs] = await timed(() => createHttpClient(values.api!).getAuditBundle(created.id))
   const [report, verifyMs] = await timed(() => verifyElection({ ...bundle }, { publishedHead: bundle.head }))
   for (const s of report.steps) console.log(`  ${s.status === 'ok' ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${s.title}`)
-  ok(`descărcare ${downloadMs.toFixed(0)} ms, verificare ${(verifyMs / 1000).toFixed(2)} s (${(verifyMs / N).toFixed(1)} ms/buletin)`)
+  ok(`descărcare ${downloadMs.toFixed(0)} ms, verificare ${decimal(verifyMs / 1000, 2)} s (${decimal(verifyMs / N)} ms/buletin)`)
   metrics.verifyTotalMs = +verifyMs.toFixed(0)
   metrics.verifyPerBallotMs = +(verifyMs / N).toFixed(2)
   if (WORKERS > 1) {
@@ -171,7 +171,7 @@ async function main() {
     const same = JSON.stringify(parallel) === JSON.stringify(report)
     const speedup = verifyMs / parallelMs
     ;(same ? ok : badLine)(
-      `în paralel, pe ${WORKERS} fire: ${(parallelMs / 1000).toFixed(2)} s, de ${speedup.toFixed(1)} ori mai rapid; raport ${same ? 'identic' : 'DIFERIT'}`,
+      `în paralel, pe ${WORKERS} fire: ${decimal(parallelMs / 1000, 2)} s, de ${decimal(speedup)} ori mai rapid; raport ${same ? 'identic' : 'DIFERIT'}`,
     )
     metrics.verifyThreads = WORKERS
     metrics.verifyParallelMs = +parallelMs.toFixed(0)

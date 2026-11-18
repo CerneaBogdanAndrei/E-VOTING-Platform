@@ -63,11 +63,18 @@ export class ElectionsService {
     }))
     if (trustees.length < 1) throw bad('Este necesar cel puțin un trustee')
     const allowBlank = input.allowBlank === true
+    const requireNfc = input.requireNfc === true
 
     const id = `${slug(title)}-${randomToken(3)}`
     const tokens = trustees.map((t, i) => ({ trusteeId: `${id}-t${i + 1}`, name: t.name, token: randomToken() }))
     await this.db.transaction(async (client) => {
-      await client.query('INSERT INTO elections (id, title, opens_at, closes_at) VALUES ($1, $2, $3, $4)', [id, title, opensAt, closesAt])
+      await client.query('INSERT INTO elections (id, title, opens_at, closes_at, require_nfc) VALUES ($1, $2, $3, $4, $5)', [
+        id,
+        title,
+        opensAt,
+        closesAt,
+        requireNfc,
+      ])
       await this.insertCandidates(client, id, candidates, allowBlank)
       for (const [i, t] of tokens.entries()) {
         // doar hash-ul token-ului intră în bază
@@ -79,7 +86,13 @@ export class ElectionsService {
           sha256(t.token),
         ])
       }
-      await this.audit.log(adminActor(by), 'election.create', id, { title, candidates: candidates.length, allowBlank, trustees: trustees.length }, client)
+      await this.audit.log(
+        adminActor(by),
+        'election.create',
+        id,
+        { title, candidates: candidates.length, allowBlank, requireNfc, trustees: trustees.length },
+        client,
+      )
     })
     return { election: await this.elections.get(id), trusteeTokens: tokens }
   }
@@ -97,7 +110,7 @@ export class ElectionsService {
     }
   }
 
-  /** Doar în `draft`: titlul, intervalul, candidații și votul alb. Trustees rămân (au token-uri emise). */
+  /** Doar în `draft`: titlul, intervalul, candidații, votul alb și „doar NFC”. Trustees rămân (au token-uri emise). */
   async update(id: string, body: unknown, by: AdminIdentity): Promise<Election> {
     const input = obj(body, 'scrutin') as UpdateElectionInput
     await this.db.transaction(async (client) => {
@@ -107,12 +120,11 @@ export class ElectionsService {
       const opensAt = input.opensAt === undefined ? e.opens_at : isoDate(input.opensAt, 'Deschiderea')
       const closesAt = input.closesAt === undefined ? e.closes_at : isoDate(input.closesAt, 'Închiderea')
       if (closesAt <= opensAt) throw bad('Închiderea trebuie să fie după deschidere')
-      await client.query('UPDATE elections SET title = COALESCE($2, title), opens_at = $3, closes_at = $4 WHERE id = $1', [
-        id,
-        title ?? null,
-        opensAt,
-        closesAt,
-      ])
+      const requireNfc = input.requireNfc === undefined ? null : input.requireNfc === true
+      await client.query(
+        'UPDATE elections SET title = COALESCE($2, title), opens_at = $3, closes_at = $4, require_nfc = COALESCE($5, require_nfc) WHERE id = $1',
+        [id, title ?? null, opensAt, closesAt, requireNfc],
+      )
       if (input.candidates !== undefined || input.allowBlank !== undefined) {
         const current = await client.query<{ name: string; description: string; kind: string }>(
           'SELECT name, description, kind FROM candidates WHERE election_id = $1 ORDER BY position',

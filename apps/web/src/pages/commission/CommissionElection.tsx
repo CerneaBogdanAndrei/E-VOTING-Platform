@@ -99,6 +99,9 @@ export function CommissionElection() {
           <Link to={`/scrutin/${e.id}`} className="btn">
             Pagina publică
           </Link>
+          <Link to={`/scrutin/${e.id}/proces-verbal`} className="btn">
+            Proces-verbal
+          </Link>
           {editable && e.status === 'draft' && (
             <>
               <Link to={`/comisie/${e.id}/editare`} className="btn">
@@ -219,6 +222,9 @@ export function CommissionElection() {
               </li>
             ))}
           </ol>
+          <p className="hint mt-s">
+            Înregistrare: {e.requireNfc ? 'doar cu cartea electronică (NFC), scanarea optică e refuzată.' : 'prin scanarea buletinului (OCR) sau prin NFC.'}
+          </p>
         </div>
       </div>
 

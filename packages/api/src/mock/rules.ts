@@ -56,7 +56,8 @@ export function updateElection(ctx: MockContext, s: ElectionState, input: Update
   s.data.title = title
   s.data.opensAt = opensAt
   s.data.closesAt = closesAt
-  ctx.log(s, 'comisie', 'election.update', { title, candidates: s.data.candidates.length })
+  if (input.requireNfc !== undefined) s.data.requireNfc = input.requireNfc === true
+  ctx.log(s, 'comisie', 'election.update', { title, candidates: s.data.candidates.length, requireNfc: s.data.requireNfc })
 }
 
 export function deleteElection(ctx: MockContext, s: ElectionState) {
@@ -177,6 +178,7 @@ export function removeCsv(ctx: MockContext, s: ElectionState, csv: string): Elig
  */
 export function register(ctx: MockContext, s: ElectionState, cnp: string, credentialPubkey: string, method: RegistrationMethod): Registration {
   if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Înregistrarea s-a închis pentru acest scrutin')
+  if (s.data.requireNfc && method !== 'nfc') throw new ApiError(403, 'Acest scrutin acceptă doar înregistrarea cu cartea electronică (NFC)')
   if (!isValidCnp(cnp)) throw new ApiError(400, 'CNP invalid')
   if (!isCredentialPubkey(credentialPubkey)) throw new ApiError(400, 'Cheia de credential nu e o cheie Ed25519 validă')
   const h = ctx.hmac(cnp)
@@ -230,7 +232,7 @@ export function voteRandomly(ctx: MockContext, s: ElectionState, count: number, 
     if (done >= count) break
     if (s.registeredHmacs.has(ctx.hmac(cnp))) continue
     const cred = generateCredential()
-    register(ctx, s, cnp, cred.publicKey, ctx.rand() < 0.35 ? 'nfc' : 'ocr')
+    register(ctx, s, cnp, cred.publicKey, s.data.requireNfc || ctx.rand() < 0.35 ? 'nfc' : 'ocr')
     const { ballot } = prepareBallot(election, cred, pickWeighted(ctx.rand, weights))
     const at = start ? new Date(start.getTime() + (spanMs * (done + 1)) / (count + 1)).toISOString() : undefined
     cast(ctx, s, ballot, at, verify)

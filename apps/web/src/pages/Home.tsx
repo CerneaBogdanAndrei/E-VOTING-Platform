@@ -41,6 +41,7 @@ export function Home() {
               <div className="card-meta">
                 <span>
                   {e.candidates.filter((c) => c.kind === 'candidate').length} candidați{e.candidates.some((c) => c.kind === 'blank') ? ' + vot alb' : ''}
+                  {e.requireNfc ? ' · doar NFC' : ''}
                   {phase ? ` · ${phase}` : ''}
                 </span>
                 <span>

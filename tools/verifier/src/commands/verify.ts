@@ -2,7 +2,7 @@
 // opțional față de hash-ul publicat independent. Codul de ieșire e 0 doar dacă trece tot.
 
 import { readFile, writeFile } from 'node:fs/promises'
-import { createHttpClient, type AuditBundleResponse } from '@evoting/api'
+import { createHttpClient, decimal, type AuditBundleResponse } from '@evoting/api'
 import { sequentialWork, verifyElection, type BallotWork, type StepId } from '@evoting/crypto'
 import { createNodeWork, defaultThreads } from '@evoting/crypto/node'
 import { CliExit, die, GREEN, RED, statusIcon } from '../output.js'
@@ -96,7 +96,7 @@ export async function verify(options: VerifyOptions) {
       for (const f of s.failures) console.log(`     ${RED(`${f.where}:`)} ${f.message}`)
     })
     console.log(`\nUltimul hash al board-ului: ${report.head}`)
-    console.log(`Verificare completă în ${(total / 1000).toFixed(2)} s, pe ${threads === 1 ? 'un fir' : `${threads} fire`}`)
+    console.log(`Verificare completă în ${decimal(total / 1000, 2)} s, pe ${threads === 1 ? 'un fir' : `${threads} fire`}`)
     console.log(report.ok ? `\n${GREEN('REZULTATUL ESTE VERIFICAT.')}` : `\n${RED('VERIFICAREA A PICAT: rezultatul nu este de încredere.')}`)
   }
   if (!report.ok) throw new CliExit(1)

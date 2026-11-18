@@ -2,6 +2,7 @@
 export {
   BLANK_LABEL,
   candidateLabel,
+  decimal,
   errorMessage,
   formatDateTime,
   formatDuration,

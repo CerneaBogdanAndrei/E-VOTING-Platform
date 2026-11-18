@@ -1,10 +1,11 @@
 // Comisia: membri cu roluri (comisie / observator), editarea și ștergerea scrutinelor
-// în configurare, votul alb.
+// în configurare, votul alb, scoaterea din lista de eligibili, scrutinul „doar NFC”.
 
 import assert from 'node:assert/strict'
 import { after, before, describe, it } from 'node:test'
-import { prepareBallot, submitBallot, type ApiClient, type Election } from '@evoting/api'
+import { buildTd1, prepareBallot, submitBallot, type ApiClient, type Election } from '@evoting/api'
 import { generateCredential, generateTrusteeKey, partialDecrypt, verifyElection } from '@evoting/crypto'
+import { createTestChip } from '../src/nfc/test-pki.js'
 import { databaseAvailable, electionInput, rejects, resetDatabase, startServer, type TestServer } from './helpers.js'
 
 const available = await databaseAvailable()
@@ -170,5 +171,30 @@ describe('backend: comisia', { skip: !available }, () => {
       (await s.api.getResult(election.id)).counts.map((c) => c.votes),
       [1, 1, 0],
     )
+  })
+
+  it('scrutinul „doar NFC”: OCR-ul e refuzat, cipul semnat e acceptat; setarea se poate schimba doar în configurare', async () => {
+    const CNP = '6050101400015'
+    const { election, trusteeTokens } = await s.api.createElection(electionInput({ trustees: [{ name: 'T' }], requireNfc: true }))
+    assert.equal(election.requireNfc, true)
+    // implicit, un scrutin acceptă ambele metode; setarea se poate schimba cât e în configurare
+    const { election: other } = await s.api.createElection(electionInput({ title: 'Ambele metode' }))
+    assert.equal(other.requireNfc, false)
+    assert.equal((await s.api.updateElection(other.id, { requireNfc: true })).requireNfc, true)
+    assert.equal((await s.api.updateElection(other.id, { title: 'Doar titlul' })).requireNfc, true)
+
+    await s.api.submitTrusteeKey(election.id, trusteeTokens[0].token, generateTrusteeKey(election.id, trusteeTokens[0].trusteeId).publicKey)
+    await s.api.importEligible(election.id, CNP)
+    const opened = await s.api.openElection(election.id)
+    await assert.rejects(s.api.updateElection(election.id, { requireNfc: false }), rejects(409))
+
+    const v = generateCredential()
+    await assert.rejects(s.api.registerOcr(election.id, { cnp: CNP, credentialPubkey: v.publicKey }), rejects(403, /doar înregistrarea cu cartea electronică/))
+    const chip = await createTestChip(s.pki, buildTd1({ surname: 'Ion', givenNames: 'Ana', documentNumber: 'GL1234567', cnp: CNP, sex: 'F', expiry: '330101' }))
+    const reg = await s.api.registerNfc(election.id, { ...chip, credentialPubkey: v.publicKey })
+    assert.equal(reg.trustLevel, 'criptografic')
+    await submitBallot(s.api, opened, v, prepareBallot(opened, v, 1))
+    const created = (await s.api.getAuditLog(election.id)).find((x) => x.action === 'election.create')!
+    assert.equal((created.payload as { requireNfc: boolean }).requireNfc, true)
   })
 })
