@@ -19,7 +19,7 @@ npm run build -w @evoting/web && npm run lint -w @evoting/web
 | `src/pages/Home.tsx`, `About.tsx` | Lista scrutinelor și „Cum funcționează”. |
 | `src/pages/commission/` | `CommissionList`, `CommissionNew`, `CommissionEdit`, `ElectionForm` (formularul comun), `CommissionMembers`, `CommissionElection` și bucățile ei în `parts/` (`Steps`, `TrusteeTokens`, `EligibleImport`, `BoardHead`, `AuditLog`, `MockToolsPanel`). |
 | `src/pages/election/` | `ElectionPublic` și tab-urile ei în `tabs/` (`BoardTab`, `ResultTab`, `VerificationTab`, `BenalohTab`, `ParametersTab`). |
-| `src/lib/` | `format.ts` (re-exportă formatările comune din `@evoting/api`), `useAsync.ts`. |
+| `src/lib/` | `format.ts` (re-exportă formatările comune din `@evoting/api`), `useAsync.ts`, `verify-workers.ts` și `verify.worker.ts` (verificarea publică în paralel, pe Web Workers). |
 | `src/styles/` | CSS pe module, importate în ordine de `index.css` (`tokens`, `base`, `layout`, `cards`, `forms`, `feedback`, `tables`, `results`, `verification`, `responsive`). |
 | `Dockerfile`, `nginx.conf` | Build-ul cu Vite, servit de nginx. |
 

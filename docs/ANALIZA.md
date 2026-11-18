@@ -115,7 +115,7 @@ Comportamentul nu s-a schimbat; toate exporturile publice ale pachetelor sunt ac
 
 ## 5. Ce s-a rezolvat după analiză (17–18 noiembrie)
 
-Din cele 30 de puncte din secțiunea 2: **11 rezolvate, 6 parțial, 13 rămase**. Testele au crescut de la 78 la 93 (crypto 45, api 20, backend 28).
+Din cele 30 de puncte din secțiunea 2: **12 rezolvate, 6 parțial, 12 rămase**. Testele au crescut de la 78 la 93 (crypto 45, api 20, backend 28), apoi, la a doua verificare din 18 nov., la 108 (crypto 54, api 23, backend 31).
 
 | # | Punctul | Starea | Ce s-a făcut / ce lipsește |
 | --- | --- | --- | --- |
@@ -140,7 +140,7 @@ Din cele 30 de puncte din secțiunea 2: **11 rezolvate, 6 parțial, 13 rămase**
 | 19 | Verificatorul nu verifică timpii | rezolvat | Ore valide, crescătoare și în `[opensAt, closesAt]`. Serverul ia ora după blocarea board-ului (reparat pe 18 nov.). |
 | 20 | Cod criptografic neauditat | rămâne | |
 | 21 | Board și audit-bundle fără paginare | parțial | `GET /elections/:id/board/page`, folosit de site. Pachetul de audit se descarcă tot întreg (fără NDJSON). |
-| 22 | Verificare liniară, pe un fir | rămâne | |
+| 22 | Verificare liniară, pe un fir | rezolvat | Semnăturile, dovezile și agregatul se verifică pe bucăți, pe toate nucleele: `worker_threads` (`evoting-verify --workers N`, CLI-ul trustee, simulatorul) și Web Workers (site). Raport identic cu cel pe un fir. 1.000 de buletine: ~30 s → ~6 s pe 16 nuclee logice (×4,9; i7-10700F, 8 nuclee fizice) (`docs/evaluare/verificare-paralela-18-nov.json`). Semnăturile în lot rămân. |
 | 23 | ~25 ms de validare per buletin pe server | rămâne | |
 | 24 | `useAsync` și `format.ts` duplicate | parțial | Formatările sunt acum în `packages/api/src/format.ts`, comune; `useAsync` e încă duplicat. |
 | 25 | Fără teste pentru interfețe | rămâne | |
@@ -152,4 +152,6 @@ Din cele 30 de puncte din secțiunea 2: **11 rezolvate, 6 parțial, 13 rămase**
 
 Pe lângă acestea, la verificarea finală (18 nov.) s-au reparat două probleme: ora primirii putea ieși în ordine inversă la voturi simultane (acum se ia după blocarea board-ului; două teste noi) și verificarea de sănătate a containerului backend chema `localhost` (IPv6 în container) și marca serverul „unhealthy”; acum cheamă `127.0.0.1`.
 
-**Ce urmează**, din planul de mai sus: etapa C (t-din-n, verificarea în paralel, CSCA România, autoritatea de înregistrare) și etapa D (teste pentru interfețe, `useAsync` comun, măsurători pe telefon).
+**A doua verificare (18 nov., seara).** Codul a fost recitit integral, testele rulate pe PostgreSQL și site-ul folosit cap-coadă în Chrome (comisie, membri, trustees cu CLI-ul, vot, închidere, decriptare, verificare). Reparate: o alarmă falsă „conținut modificat” în căutarea de pe board după editarea câmpului; o acuzație falsă la auditul Benaloh cu date incomplete (acum avertisment, codul 2 în CLI); confirmare la „Închide votul”; CLI-urile care se prăbușeau pe Windows la `process.exit()` după `fetch` (cod de ieșire greșit); `format:check` picat local pe Windows din cauza CRLF (`.gitattributes` cere LF); `sslmode=disable` ignorat; erorile ascunse de închiderea automată; cheile Ed25519 de ordin mic acceptate ca credential; o intrare malformată care oprea verificatorul; acordul numeralelor în română. Detalii în `GHID-COMPLET.md`, 9.15–9.17.
+
+**Ce urmează**, din planul de mai sus: etapa C (t-din-n, CSCA România, autoritatea de înregistrare, semnăturile în lot) și etapa D (teste pentru interfețe, `useAsync` comun, măsurători pe telefon).

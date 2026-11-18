@@ -60,6 +60,8 @@ Alte valori din raportul pentru 10.000:
 
 **Remăsurat pe 18 noiembrie**, pe codul final, cu 1.000 de alegători, pe un PC cu Windows și PostgreSQL în Docker Desktop (`docs/evaluare/simulare-1000-18-nov.json`): rezultatul a fost din nou exact, iar verificatorul (inclusiv noua verificare a orelor de primire) a trecut. Toți timpii au ieșit cu 25–30% mai mari (de exemplu criptarea 24 ms, verificarea 32,9 ms per buletin), inclusiv cei care nu depind deloc de server, deci diferența vine de la calculator, nu de la modificările din cod.
 
+**Verificarea în paralel** (tot pe 18 noiembrie): buletinele sunt independente, deci semnăturile, dovezile și agregatul lor se pot verifica pe toate nucleele procesorului (`worker_threads` în terminal, Web Workers în browser). Pe același pachet de 1.000 de buletine, pe un PC cu 8 nuclee fizice (16 logice): **~30 s pe un fir, ~6 s pe 16 fire** (de ~5 ori mai rapid), cu exact același raport. Tabelul complet e în `GHID-COMPLET.md`, Partea 12, iar măsurătorile în `docs/evaluare/verificare-paralela-18-nov.json`. Comanda: `npx evoting-verify --bundle arhiva.json --workers 16` (sau `--workers 1`, pentru comparație).
+
 ## 6.4 Testele automate
 
 Un **test** e un mic program care folosește codul proiectului și verifică dacă rezultatul e cel așteptat. Exemplu, în cuvinte: „criptează un vot pentru candidatul 2; verifică dovezile; trebuie să treacă”. Sau invers: „modifică un criptotext; verificarea trebuie să pice”.
@@ -74,10 +76,10 @@ assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
 
 | Suită | Câte teste | Ce verifică |
 | --- | --- | --- |
-| `packages/crypto` | 45 | JSON canonic, HMAC (cu vectorul oficial RFC 4231), ElGamal, adunarea criptotextelor, baby-step giant-step, buletine valide, toate tipurile de buletine invalide (vot 2, vot −1, două voturi, niciun vot, dovezi copiate din alt scrutin, buletin copiat de alt alegător), Benaloh, trustees care trișează, verificatorul pe 13 tipuri de manipulare (inclusiv ore greșite). |
-| `packages/api` | 20 | CNP, MRZ (exemplele oficiale ICAO, buletinul vechi, CEI, zgomot de OCR), DG1 și, pe serverul simulat, un scrutin complet, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii comisiei. |
-| `apps/backend` | 28 | Pe un PostgreSQL real: tot fluxul, token-uri greșite, import și după deschidere, re-înregistrare, NFC (cip valid, DG1 modificat, CSCA străin, semnătură alterată), autentificare, buletine invalide, două voturi simultane, board-ul append-only și paginat, trustee care trișează, verificatorul, căutarea CNP-urilor în toată baza (nu trebuie să existe niciunul), un administrator care modifică board-ul direct în bază, jurnalul de audit; intervalul (vot înainte de deschidere, 16 voturi simultane cu ore crescătoare, închiderea automată); membrii comisiei și rolurile, modificare/ștergere, votul alb; limitarea de rată; CLI-urile reale, ca procese separate. |
-| **Total** | **93** | |
+| `packages/crypto` | 54 | JSON canonic, HMAC (cu vectorul oficial RFC 4231), ElGamal, adunarea criptotextelor, baby-step giant-step, buletine valide, toate tipurile de buletine invalide (vot 2, vot −1, două voturi, niciun vot, dovezi copiate din alt scrutin, buletin copiat de alt alegător), Benaloh (inclusiv datele incomplete), trustees care trișează, verificatorul pe 13 tipuri de manipulare (inclusiv ore greșite), verificarea în paralel pe fire reale (raport identic), intrările malformate, cheile Ed25519 de ordin mic. |
+| `packages/api` | 23 | Acordul numeralelor și duratele în română, CNP, MRZ (exemplele oficiale ICAO, buletinul vechi, CEI, zgomot de OCR), DG1 și, pe serverul simulat, un scrutin complet, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii comisiei. |
+| `apps/backend` | 31 | Opțiunile SSL ale conexiunii (3 teste, fără bază). Pe un PostgreSQL real: tot fluxul, token-uri greșite, import și după deschidere, re-înregistrare, NFC (cip valid, DG1 modificat, CSCA străin, semnătură alterată), autentificare, buletine invalide, două voturi simultane, board-ul append-only și paginat, trustee care trișează, verificatorul, căutarea CNP-urilor în toată baza (nu trebuie să existe niciunul), un administrator care modifică board-ul direct în bază, jurnalul de audit; intervalul (vot înainte de deschidere, 16 voturi simultane cu ore crescătoare, închiderea automată); membrii comisiei și rolurile, modificare/ștergere, votul alb; limitarea de rată; CLI-urile reale, ca procese separate (și verificarea pe două fire). |
+| **Total** | **108** | |
 
 ### Cum rulezi testele pe PC
 
@@ -99,7 +101,7 @@ Fără `TEST_DATABASE_URL`, testele de server apar ca „sărite” (`SKIP`), nu
 
 ### Pe GitHub
 
-La fiecare `git push`, `ci.yml` rulează linterul, verificarea formatării și aceleași 93 de teste pe serverele GitHub, cu un PostgreSQL pornit ca serviciu. Pe pagina proiectului, la **Actions**, vezi ✓ sau ✗ pentru fiecare push.
+La fiecare `git push`, `ci.yml` rulează linterul, verificarea formatării și aceleași 108 teste pe serverele GitHub, cu un PostgreSQL pornit ca serviciu. Pe pagina proiectului, la **Actions**, vezi ✓ sau ✗ pentru fiecare push.
 
 ### Testul reparat recent
 

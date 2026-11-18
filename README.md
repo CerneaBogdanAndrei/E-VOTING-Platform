@@ -45,7 +45,7 @@ apk/                APK-ul construit de GitHub Actions
 ```bash
 npm install && npm run build
 npm run lint && npm run format:check
-npm test                                   # 45 + 20 de teste unitare, 28 de teste end-to-end (PostgreSQL)
+npm test                                   # 54 + 23 de teste unitare, 31 pentru server (28 end-to-end pe PostgreSQL)
 
 npm run dev -w @evoting/web                # site-ul, cu backend simulat: http://localhost:5173
 cd apps/mobile && npm install && npx expo start   # aplicația mobilă (Expo Go)
