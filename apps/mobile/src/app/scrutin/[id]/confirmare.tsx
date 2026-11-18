@@ -48,8 +48,8 @@ export default function ConfirmationScreen() {
         <LinkButton title={copied ? 'Copiat' : 'Copiază codul'} onPress={copy} />
       </Card>
       <P muted>
-        Cu acest cod îți găsești buletinul pe board-ul public, din aplicație sau de pe site. Codul nu dezvăluie pe cine ai votat, așa că îl poți
-        păstra fără grijă.
+        Cu acest cod îți găsești buletinul pe board-ul public, din aplicație sau de pe site. Codul nu dezvăluie pe cine ai votat, așa că îl poți păstra fără
+        grijă.
       </P>
 
       <Button title="Verifică pe board" onPress={() => router.push({ pathname: '/scrutin/[id]/verifica', params: { id } })} />

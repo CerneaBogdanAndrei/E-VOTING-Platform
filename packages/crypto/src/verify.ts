@@ -14,6 +14,9 @@ export interface AuditBundle {
     publicKey: string | null
     candidates: { id: string; position: number; name?: string }[]
     trustees: { id: string; name?: string; publicKeyShare: string | null; keyProof?: ChaumPedersenProof | null }[]
+    /** Dacă sunt date, fiecare buletin trebuie primit în acest interval. */
+    opensAt?: string
+    closesAt?: string
   }
   /** Credentialele înregistrate (doar cheile publice, fără nicio legătură cu identitatea). */
   registrations: { credentialPubkey: string }[]
@@ -106,17 +109,32 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
   }
   const params: ElectionParams | null = election.publicKey ? { electionId: election.id, publicKey: election.publicKey, candidateCount: n } : null
 
-  // 1. Lanțul
+  // 1. Lanțul (și timpii: ordonați, în intervalul scrutinului)
   const chain = step('chain')
   let prev = genesisHash(election.id)
+  let prevTime = -Infinity
+  const opens = election.opensAt ? Date.parse(election.opensAt) : null
+  const closes = election.closesAt ? Date.parse(election.closesAt) : null
   for (let k = 0; k < board.length; k++) {
     const e = board[k]
     const where = `buletinul #${e.seq}`
     if (e.seq !== k + 1) fail(chain, where, `Poziție așteptată ${k + 1}, găsită ${e.seq} (ordinea a fost schimbată sau lipsesc intrări)`)
     if (e.prevHash !== prev) fail(chain, where, 'Hash-ul anterior nu corespunde intrării dinainte')
+    const t = Date.parse(e.receivedAt)
+    if (Number.isNaN(t)) fail(chain, where, 'Data primirii nu e validă')
+    else {
+      if (t < prevTime) fail(chain, where, 'Data primirii e mai veche decât a intrării anterioare: ordinea în timp e încălcată')
+      if (opens !== null && t < opens) fail(chain, where, 'Buletin primit înainte de deschiderea votului')
+      if (closes !== null && t > closes) fail(chain, where, 'Buletin primit după închiderea votului')
+      prevTime = t
+    }
     const bh = ballotHash(entryToBallot(election.id, e))
     if (bh !== e.ballotHash) {
-      fail(chain, where, `Conținutul a fost modificat: hash-ul recalculat al buletinului (${bh.slice(0, 8)}…) ≠ cel publicat (${String(e.ballotHash).slice(0, 8)}…)`)
+      fail(
+        chain,
+        where,
+        `Conținutul a fost modificat: hash-ul recalculat al buletinului (${bh.slice(0, 8)}…) ≠ cel publicat (${String(e.ballotHash).slice(0, 8)}…)`,
+      )
     }
     const h = computeEntryHash({ electionId: election.id, seq: e.seq, prevHash: e.prevHash, ballotHash: bh, receivedAt: e.receivedAt })
     if (h !== e.hash) fail(chain, where, `Hash-ul intrării recalculat (${h.slice(0, 8)}…) ≠ codul de urmărire publicat (${e.hash.slice(0, 8)}…)`)
@@ -162,7 +180,12 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
     for (let k = 0; k < board.length; k++) {
       const e = board[k]
       const check = verifyBallotProofs(params, entryToBallot(election.id, e))
-      if (!check.ok) fail(proofs, `buletinul #${e.seq}${check.candidate !== undefined ? `, ${candidates[check.candidate]?.name ?? `poziția ${check.candidate + 1}`}` : ''}`, check.reason)
+      if (!check.ok)
+        fail(
+          proofs,
+          `buletinul #${e.seq}${check.candidate !== undefined ? `, ${candidates[check.candidate]?.name ?? `poziția ${check.candidate + 1}`}` : ''}`,
+          check.reason,
+        )
       await progress('proofs', k + 1, board.length)
     }
     if (proofs.status === 'ok') proofs.details.push(`${board.length} buletine × ${n} dovezi 0/1 + dovada sumei: toate valide`)
@@ -208,7 +231,12 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
         continue
       }
       const check = verifyPartialDecryption(election.id, t.publicKeyShare ?? '', published, p)
-      if (!check.ok) fail(dec, `trustee-ul ${t.name ?? t.id}${check.candidate !== undefined ? `, ${candidates[check.candidate]?.name ?? check.candidate + 1}` : ''}`, check.reason)
+      if (!check.ok)
+        fail(
+          dec,
+          `trustee-ul ${t.name ?? t.id}${check.candidate !== undefined ? `, ${candidates[check.candidate]?.name ?? check.candidate + 1}` : ''}`,
+          check.reason,
+        )
     }
     if (partials.length !== election.trustees.length) fail(dec, 'decriptări parțiale', 'Numărul decriptărilor nu corespunde numărului de trustees')
     if (dec.status === 'ok') {

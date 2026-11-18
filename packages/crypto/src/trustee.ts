@@ -3,17 +3,7 @@
 // Dᵢⱼ = xᵢAⱼ pentru agregatul fiecărui candidat, cu dovadă Chaum-Pedersen.
 
 import { decodeCiphertext } from './elgamal.js'
-import {
-  G,
-  mulSecret,
-  pointFromHex,
-  pointToHex,
-  randomNonZeroScalar,
-  scalarFromHex,
-  scalarToHex,
-  ZERO,
-  type Point,
-} from './group.js'
+import { G, mulSecret, pointFromHex, pointToHex, randomNonZeroScalar, scalarFromHex, scalarToHex, ZERO, type Point } from './group.js'
 import { DOMAIN, proveEqualLogs, proveSchnorr, verifyEqualLogs, verifySchnorr } from './proofs.js'
 import type { Ciphertext, PartialDecryption, TrusteePublicKey } from './types.js'
 

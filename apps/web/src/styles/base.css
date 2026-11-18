@@ -1,0 +1,67 @@
+/* Reset, tipografie și clase utilitare mici. */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: 26px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h2,
+h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 13px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.wrap {
+  word-break: break-all;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.space-between {
+  justify-content: space-between;
+}
+.gap-s {
+  gap: 8px;
+}
+.mt {
+  margin-top: 18px;
+}
+.mt-s {
+  margin-top: 10px;
+}

@@ -1,0 +1,122 @@
+/* Butoane, câmpuri și formulare. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-2);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-2);
+  color: #fff;
+}
+.btn-danger {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #a82834;
+  border-color: #a82834;
+  color: #fff;
+}
+.btn-small {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.btn-icon {
+  width: 34px;
+  padding: 0;
+}
+.input {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+textarea.input {
+  resize: vertical;
+}
+.input:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+.form {
+  max-width: 820px;
+}
+.form > .card + .card {
+  margin-top: 16px;
+}
+.form > .alert,
+.form > .row {
+  margin-top: 16px;
+}
+.field {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  font-weight: 550;
+}
+.row-edit {
+  display: grid;
+  grid-template-columns: 24px 1fr 1.3fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.row-edit-short {
+  grid-template-columns: 24px 1fr auto;
+}
+.row-index {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+.search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  max-width: 720px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+select.input {
+  appearance: auto;
+}

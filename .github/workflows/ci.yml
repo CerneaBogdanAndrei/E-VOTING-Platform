@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    name: Teste (criptografie, API, backend pe PostgreSQL)
+    name: Lint, format, teste (criptografie, API, backend pe PostgreSQL, CLI-uri)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -31,8 +31,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm test
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
 
   mobile:
     name: Aplicația mobilă (tipuri și bundle Android)

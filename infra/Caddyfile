@@ -1,0 +1,17 @@
+# Reverse proxy cu HTTPS pentru Docker Compose: site-ul la https://localhost, API-ul la https://localhost/api.
+# `tls internal` emite un certificat local (self-signed) pentru demo; pentru un domeniu real,
+# înlocuiește `localhost` cu domeniul și scoate `tls internal`: Caddy obține singur certificatul Let's Encrypt.
+{$SITE_ADDRESS:localhost} {
+	tls internal
+	encode gzip
+
+	# API-ul: /api/... → backend:3000/..., fără prefixul /api
+	handle_path /api/* {
+		reverse_proxy backend:3000
+	}
+
+	# site-ul static (React), servit de nginx în containerul web
+	handle {
+		reverse_proxy web:80
+	}
+}

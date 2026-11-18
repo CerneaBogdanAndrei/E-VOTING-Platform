@@ -21,7 +21,7 @@ const control = (first12: string) => {
 }
 
 let seed = 2026
-const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647
 
 // „Baza de date furată”: 200 de alegători, o dată cu SHA-256 simplu, o dată cu HMAC.
 const voters = Array.from({ length: 200 }, () => generateCnp(rand))
@@ -34,10 +34,12 @@ console.log('Demonstrația 1: dicționar de CNP-uri pe o bază de date furată\n
 console.log(`Victima (fictivă) s-a născut pe ${victim.slice(5, 7)}.${victim.slice(3, 5)}.20${victim.slice(1, 3)}; atacatorul știe doar atât.\n`)
 
 function* candidatesFor(birth: string) {
-  for (const s of ['5', '6']) for (let county = 1; county <= 52; county++) for (let n = 1; n <= 999; n++) {
-    const first12 = `${s}${birth}${String(county).padStart(2, '0')}${String(n).padStart(3, '0')}`
-    yield first12 + control(first12)
-  }
+  for (const s of ['5', '6'])
+    for (let county = 1; county <= 52; county++)
+      for (let n = 1; n <= 999; n++) {
+        const first12 = `${s}${birth}${String(county).padStart(2, '0')}${String(n).padStart(3, '0')}`
+        yield first12 + control(first12)
+      }
 }
 
 const birth = victim.slice(1, 7)
@@ -65,6 +67,8 @@ const t1 = performance.now()
 const wrongKey = randomBytes(32).toString('hex')
 for (const cnp of candidatesFor(birth)) if (leakedHmac.has(cnpHmac(wrongKey, cnp))) hits++
 console.log('\nStocare HMAC-SHA256(k, CNP), cu k ținut în afara bazei de date:')
-console.log(`  \x1b[32m0 potriviri\x1b[0m din ${tries.toLocaleString('ro-RO')}+ încercări (${hits} găsite, ${(performance.now() - t1).toFixed(0)} ms): fără k, amprenta nu se poate reface.`)
+console.log(
+  `  \x1b[32m0 potriviri\x1b[0m din ${tries.toLocaleString('ro-RO')}+ încercări (${hits} găsite, ${(performance.now() - t1).toFixed(0)} ms): fără k, amprenta nu se poate reface.`,
+)
 console.log('  Ghicirea lui k: 2²⁵⁶ variante, imposibil.')
 console.log(`\nValid: ${isValidCnp(victim)} · CNP-urile din demonstrație sunt generate aleator și nu aparțin nimănui.`)

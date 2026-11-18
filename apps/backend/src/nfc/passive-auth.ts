@@ -44,13 +44,10 @@ const SIGNATURES: Record<string, { hash?: string; kind: 'ecdsa' | 'rsa' }> = {
   [OID.rsaEncryption]: { kind: 'rsa' },
 }
 
-export type PassiveAuthResult =
-  | { ok: true; signer: string; issuer: string; hashAlgorithm: string; dataGroups: number[] }
-  | { ok: false; reason: string }
+export type PassiveAuthResult = { ok: true; signer: string; issuer: string; hashAlgorithm: string; dataGroups: number[] } | { ok: false; reason: string }
 
 const fail = (reason: string): PassiveAuthResult => ({ ok: false, reason })
-const toBuffer = (ab: ArrayBuffer | ArrayBufferView) =>
-  ArrayBuffer.isView(ab) ? Buffer.from(ab.buffer, ab.byteOffset, ab.byteLength) : Buffer.from(ab)
+const toBuffer = (ab: ArrayBuffer | ArrayBufferView) => (ArrayBuffer.isView(ab) ? Buffer.from(ab.buffer, ab.byteOffset, ab.byteLength) : Buffer.from(ab))
 
 /** EF.SOD începe cu eticheta aplicației 23 (0x77) în jurul ContentInfo-ului CMS. */
 export function unwrapSod(sod: Uint8Array): Uint8Array {

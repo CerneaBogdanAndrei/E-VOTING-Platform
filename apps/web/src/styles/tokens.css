@@ -1,0 +1,28 @@
+/* Culorile, fonturile și dimensiunile comune (aceleași ca în apps/mobile/src/lib/theme.ts). */
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f7f9fc;
+  --ink: #0e1726;
+  --ink-2: #334155;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --line-2: #cbd5e1;
+  --accent: #2b59e8;
+  --accent-2: #2047c4;
+  --accent-soft: #edf2ff;
+  --ok: #0f8a5f;
+  --ok-soft: #e6f6ee;
+  --ok-line: #bfe6d3;
+  --bad: #c4323f;
+  --bad-soft: #fdeef0;
+  --bad-line: #f3c3c8;
+  --warn: #a35f00;
+  --warn-soft: #fff4e0;
+  --warn-line: #f5d9a8;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 18px rgba(15, 23, 42, 0.05);
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, 'SF Mono', Menlo, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color-scheme: light;
+}

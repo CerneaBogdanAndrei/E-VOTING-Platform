@@ -7,17 +7,7 @@
 //   Disjunctivă 0/1  (A, B) criptează 0 SAU 1, fără a spune care (fiecare criptotext din buletin)
 
 import { hashToScalar } from './hash.js'
-import {
-  G,
-  modQ,
-  mulPublic,
-  mulSecret,
-  pointToHex,
-  randomScalar,
-  scalarFromHex,
-  scalarToHex,
-  type Point,
-} from './group.js'
+import { G, modQ, mulPublic, mulSecret, pointToHex, randomScalar, scalarFromHex, scalarToHex, type Point } from './group.js'
 import type { ChaumPedersenProof, ZeroOneProof } from './types.js'
 
 export const DOMAIN = {
@@ -48,14 +38,7 @@ export function verifySchnorr(domain: string, context: readonly string[], y: Poi
 // ───────────── Chaum-Pedersen ─────────────
 
 /** Dovedește că U = wG și V = wH folosesc același w. */
-export function proveEqualLogs(
-  domain: string,
-  context: readonly string[],
-  h: Point,
-  u: Point,
-  v: Point,
-  w: bigint,
-): ChaumPedersenProof {
+export function proveEqualLogs(domain: string, context: readonly string[], h: Point, u: Point, v: Point, w: bigint): ChaumPedersenProof {
   const k = randomScalar()
   const t1 = mulSecret(G, k)
   const t2 = mulSecret(h, k)
@@ -63,14 +46,7 @@ export function proveEqualLogs(
   return { c: scalarToHex(c), s: scalarToHex(modQ(k + c * w)) }
 }
 
-export function verifyEqualLogs(
-  domain: string,
-  context: readonly string[],
-  h: Point,
-  u: Point,
-  v: Point,
-  proof: ChaumPedersenProof,
-): boolean {
+export function verifyEqualLogs(domain: string, context: readonly string[], h: Point, u: Point, v: Point, proof: ChaumPedersenProof): boolean {
   const c = scalarFromHex(proof?.c, 'dovadă.c')
   const s = scalarFromHex(proof?.s, 'dovadă.s')
   const t1 = mulPublic(G, s).subtract(mulPublic(u, c))
@@ -85,14 +61,7 @@ export function verifyEqualLogs(
 // provocarea și răspunsul. Provocarea totală c = c₀ + c₁ e fixată de hash,
 // deci prover-ul poate simula cel mult o ramură.
 
-export function proveZeroOne(
-  context: readonly string[],
-  y: Point,
-  a: Point,
-  b: Point,
-  m: 0 | 1,
-  r: bigint,
-): ZeroOneProof {
+export function proveZeroOne(context: readonly string[], y: Point, a: Point, b: Point, m: 0 | 1, r: bigint): ZeroOneProof {
   const v = [b, b.subtract(G)]
   const other = (1 - m) as 0 | 1
   const c = [0n, 0n]

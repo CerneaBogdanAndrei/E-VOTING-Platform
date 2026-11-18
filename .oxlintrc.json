@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "react"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/react-in-jsx-scope": "off",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "react/style-prop-object": "off",
+    "typescript/no-extraneous-class": "off"
+  },
+  "ignorePatterns": ["**/dist/**", "**/dist-test/**", "**/node_modules/**", "demos/macheta/**", "apps/mobile/android/**", "apk/**"]
+}

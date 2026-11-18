@@ -17,7 +17,10 @@
   "scripts": {
     "build": "npm run build:packages && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier -w @evoting/simulator -w @evoting/attacks && npm run build -w @evoting/web",
     "build:packages": "npm run build -w @evoting/crypto -w @evoting/api",
-    "test": "npm run build:packages && npm test -w @evoting/crypto -w @evoting/api && npm test -w @evoting/backend",
+    "test": "npm run build:packages && npm test -w @evoting/crypto -w @evoting/api && npm run build -w @evoting/trustee -w @evoting/verifier && npm test -w @evoting/backend",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
@@ -25,5 +28,9 @@
   },
   "overrides": {
     "multer": "2.5.0"
+  },
+  "devDependencies": {
+    "oxlint": "^1.94.0",
+    "prettier": "^3.10.1"
   }
 }

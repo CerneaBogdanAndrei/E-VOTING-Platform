@@ -8,7 +8,7 @@ name: Android APK
 
 on:
   push:
-    branches: [claude/laughing-euler-1mgtap, master, main]
+    branches: [master, main]
     paths:
       - 'apps/mobile/**'
       - 'packages/**'

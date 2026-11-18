@@ -20,3 +20,12 @@ export function pgOptions(databaseUrl: string, env: NodeJS.ProcessEnv = process.
     ssl: useSsl ? (ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false }) : false,
   }
 }
+
+/** Mesaj de avertizare când conexiunea e criptată, dar identitatea serverului nu e verificată. */
+export function sslWarning(databaseUrl: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  const opts = pgOptions(databaseUrl, env)
+  if (opts.ssl && typeof opts.ssl === 'object' && opts.ssl.rejectUnauthorized === false) {
+    return 'Conexiunea la baza de date e criptată, dar certificatul serverului nu e verificat (posibil man-in-the-middle). Pune CA-ul furnizorului în DATABASE_CA.'
+  }
+  return null
+}

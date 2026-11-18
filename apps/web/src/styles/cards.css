@@ -1,0 +1,229 @@
+/* Carduri, grile, statistici, etape, insigne și liste. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+.card + .card,
+.grid-2 + .card,
+.card + .grid-2 {
+  margin-top: 16px;
+}
+.card-link {
+  color: inherit;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.card-link:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.card-title {
+  font-size: 17px;
+  line-height: 1.35;
+  margin-bottom: 14px;
+}
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.card-dev {
+  border-style: dashed;
+  border-color: var(--warn-line);
+  background: #fffcf6;
+}
+.card-warn {
+  border-color: #e9c46a;
+  background: #fffaf0;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.grid-2 > .card + .card,
+.cards > .card + .card {
+  margin-top: 0;
+}
+
+/* Statistici */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stat-label {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.stat-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Etapele scrutinului */
+.steps {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 18px;
+  flex-wrap: wrap;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+.step-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 650;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+}
+.step.done {
+  color: var(--ok);
+}
+.step.done .step-dot {
+  background: var(--ok-soft);
+  border-color: var(--ok-line);
+}
+.step.current {
+  color: var(--accent-2);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.step.current .step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Insigne */
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.badge-draft {
+  background: var(--surface-2);
+  border-color: var(--line-2);
+  color: var(--ink-2);
+}
+.badge-open,
+.badge-ok {
+  background: var(--ok-soft);
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+.badge-closed,
+.badge-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+.badge-tallied {
+  background: var(--accent-soft);
+  border-color: #d3defd;
+  color: var(--accent-2);
+}
+
+/* Liste */
+.list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+.list-plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.trustee {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.trustee:last-child {
+  border-bottom: none;
+}
+.kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+.cmd {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+.cmd code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0e1726;
+  color: #c7d4f5;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+.audit li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eef0f4;
+}

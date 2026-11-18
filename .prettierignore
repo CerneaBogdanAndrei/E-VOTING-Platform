@@ -1,0 +1,16 @@
+# generat sau extern
+node_modules
+dist
+dist-test
+coverage
+package-lock.json
+apk
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/.expo
+apps/backend/pki
+demos/macheta
+# documentația se scrie de mână; tabelele Markdown nu se reformatează
+*.md
+*.apk
+*.png

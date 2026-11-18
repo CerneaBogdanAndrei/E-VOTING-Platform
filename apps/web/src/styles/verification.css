@@ -1,0 +1,53 @@
+/* Verificarea publică: bara de progres și raportul pe pași. */
+.progress {
+  margin: 12px 0;
+}
+.progress-label {
+  font-size: 13px;
+  color: #5b6475;
+  margin-bottom: 4px;
+}
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #eef0f4;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #3b63e0;
+  transition: width 0.2s;
+}
+.report {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+.report-step {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e3e6ec;
+  border-radius: 8px;
+  background: #fff;
+}
+.report-icon {
+  font-weight: 700;
+  width: 18px;
+}
+.report-ok .report-icon {
+  color: #0b8a5b;
+}
+.report-fail {
+  border-color: #f0b4b4;
+  background: #fff6f6;
+}
+.report-fail .report-icon,
+.report-failure {
+  color: #b42318;
+}
+.report-skipped .report-icon {
+  color: #b7791f;
+}
