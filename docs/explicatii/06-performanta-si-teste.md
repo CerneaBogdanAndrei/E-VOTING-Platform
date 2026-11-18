@@ -58,6 +58,8 @@ Alte valori din raportul pentru 10.000:
 - **Decriptarea nu depinde de numărul de voturi.** Trustees decriptează doar cele 3 totaluri, nu fiecare vot, deci durează ~13 ms indiferent dacă au votat 100 sau 10.000 de oameni.
 - **Rezultatul a fost corect de fiecare dată**, iar verificatorul a trecut toți pașii.
 
+**Remăsurat pe 18 noiembrie**, pe codul final, cu 1.000 de alegători, pe un PC cu Windows și PostgreSQL în Docker Desktop (`docs/evaluare/simulare-1000-18-nov.json`): rezultatul a fost din nou exact, iar verificatorul (inclusiv noua verificare a orelor de primire) a trecut. Toți timpii au ieșit cu 25–30% mai mari (de exemplu criptarea 24 ms, verificarea 32,9 ms per buletin), inclusiv cei care nu depind deloc de server, deci diferența vine de la calculator, nu de la modificările din cod.
+
 ## 6.4 Testele automate
 
 Un **test** e un mic program care folosește codul proiectului și verifică dacă rezultatul e cel așteptat. Exemplu, în cuvinte: „criptează un vot pentru candidatul 2; verifică dovezile; trebuie să treacă”. Sau invers: „modifică un criptotext; verificarea trebuie să pice”.
@@ -72,14 +74,14 @@ assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
 
 | Suită | Câte teste | Ce verifică |
 | --- | --- | --- |
-| `packages/crypto` | 35 | JSON canonic, HMAC (cu vectorul oficial RFC 4231), ElGamal, adunarea criptotextelor, baby-step giant-step, buletine valide, toate tipurile de buletine invalide (vot 2, vot −1, două voturi, niciun vot, dovezi copiate din alt scrutin, buletin copiat de alt alegător), Benaloh, trustees care trișează, verificatorul pe 11 tipuri de manipulare. |
-| `packages/api` | 11 | CNP, MRZ (exemplele oficiale ICAO, buletinul vechi, CEI, zgomot de OCR), DG1 și un scrutin complet pe serverul simulat. |
-| `apps/backend` | 17 | Pe un PostgreSQL real: tot fluxul, token-uri greșite, NFC (cip valid, DG1 modificat, CSCA străin, semnătură alterată), autentificare, buletine invalide, două voturi simultane, board-ul append-only, trustee care trișează, verificatorul, căutarea CNP-urilor în toată baza (nu trebuie să existe niciunul), un administrator care modifică board-ul direct în bază, jurnalul de audit, limitarea de rată. |
-| **Total** | **63** | |
+| `packages/crypto` | 45 | JSON canonic, HMAC (cu vectorul oficial RFC 4231), ElGamal, adunarea criptotextelor, baby-step giant-step, buletine valide, toate tipurile de buletine invalide (vot 2, vot −1, două voturi, niciun vot, dovezi copiate din alt scrutin, buletin copiat de alt alegător), Benaloh, trustees care trișează, verificatorul pe 13 tipuri de manipulare (inclusiv ore greșite). |
+| `packages/api` | 20 | CNP, MRZ (exemplele oficiale ICAO, buletinul vechi, CEI, zgomot de OCR), DG1 și, pe serverul simulat, un scrutin complet, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii comisiei. |
+| `apps/backend` | 28 | Pe un PostgreSQL real: tot fluxul, token-uri greșite, import și după deschidere, re-înregistrare, NFC (cip valid, DG1 modificat, CSCA străin, semnătură alterată), autentificare, buletine invalide, două voturi simultane, board-ul append-only și paginat, trustee care trișează, verificatorul, căutarea CNP-urilor în toată baza (nu trebuie să existe niciunul), un administrator care modifică board-ul direct în bază, jurnalul de audit; intervalul (vot înainte de deschidere, 16 voturi simultane cu ore crescătoare, închiderea automată); membrii comisiei și rolurile, modificare/ștergere, votul alb; limitarea de rată; CLI-urile reale, ca procese separate. |
+| **Total** | **93** | |
 
 ### Cum rulezi testele pe PC
 
-Din `D:\Licenta_E-vote`, în PowerShell:
+Din folderul proiectului, în PowerShell:
 
 ```bash
 $env:TEST_DATABASE_URL="postgres://evoting:evoting@localhost:5433/evoting_test"; npm test
@@ -97,11 +99,15 @@ Fără `TEST_DATABASE_URL`, testele de server apar ca „sărite” (`SKIP`), nu
 
 ### Pe GitHub
 
-La fiecare `git push`, `ci.yml` rulează aceleași 63 de teste pe serverele GitHub, cu un PostgreSQL pornit ca serviciu. Pe pagina proiectului, la **Actions**, vezi ✓ sau ✗ pentru fiecare push.
+La fiecare `git push`, `ci.yml` rulează linterul, verificarea formatării și aceleași 93 de teste pe serverele GitHub, cu un PostgreSQL pornit ca serviciu. Pe pagina proiectului, la **Actions**, vezi ✓ sau ✗ pentru fiecare push.
 
 ### Testul reparat recent
 
 Testul „două voturi trimise simultan cu același credential” trimite două voturi diferite în același timp și verifică dacă doar unul intră. Ordinea în care ajung e întâmplătoare. Testul presupunea că intră mereu primul, deci uneori numărătoarea finală nu se potrivea și CI-ul pica. Acum testul ține cont de votul care a intrat efectiv. Aplicația a fost corectă tot timpul.
+
+### O problemă găsită de teste noi (18 noiembrie)
+
+Când verificatorul a început să ceară ca orele de primire de pe board să fie crescătoare, s-a observat că serverul lua ora **înainte** să blocheze board-ul, iar verificarea dovezilor durează ~25 ms. Două voturi trimise aproape deodată puteau intra pe board în ordinea inversă orelor lor, iar verificatorul ar fi raportat fals o manipulare. Acum ora se ia după blocare și nu poate fi mai devreme decât a intrării anterioare. Testul nou trimite 16 voturi deodată și verifică orele și verificatorul.
 
 ## 6.5 Demonstrațiile de atac
 
@@ -126,16 +132,17 @@ npm run bsgs -w @evoting/attacks
 
 ## 6.6 Comenzile utile, într-un singur loc
 
-Toate din `D:\Licenta_E-vote`:
+Toate din folderul proiectului:
 
 | Ce vrei | Comanda |
 | --- | --- |
 | Instalezi tot (o dată, sau după `git pull`) | `npm install` |
 | Compilezi tot | `npm run build` |
+| Verifici stilul codului | `npm run lint` și `npm run format:check` (`npm run format` îl repară) |
 | Rulezi testele | vezi 6.4 |
 | Pornești serverul pe Supabase, fără Docker | `cd apps/backend` apoi `npm run dev` |
 | Pornești site-ul în dezvoltare (port 5173) | `cd apps/web` apoi `npm run dev` |
-| Pornești tot cu Docker (site 8080, API 3000) | `docker compose up --build -d` |
+| Pornești tot cu Docker (https://localhost; direct: site 8080, API 3000) | `docker compose up --build -d` |
 | Oprești Docker | `docker compose down` |
 | Vezi ce containere rulează | `docker compose ps` |
 | Vezi jurnalul serverului din Docker | `docker compose logs backend` |

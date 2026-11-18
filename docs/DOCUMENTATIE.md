@@ -62,18 +62,21 @@ Limitări asumate (din plan): rezistența la constrângere și la cumpărarea vo
 Toate componentele vorbesc doar cu backend-ul. O dovadă generată pe telefon e verificată de **exact același cod** pe server, în browser și în verificatorul CLI.
 
 ```
-packages/crypto/     ElGamal pe ristretto255, dovezi ZK, board, numărare, verificatorul public (+ 35 de teste)
-packages/api/        contractul HTTP (tipuri), clientul, backend-ul simulat, CNP, MRZ, DG1 (+ 11 teste)
-apps/backend/        NestJS + PostgreSQL: înregistrare, autentificare, board, numărare, Passive Authentication (+ 17 teste e2e)
-apps/web/            panoul comisiei și pagina publică: board, rezultat, verificare publică, audit Benaloh
+packages/crypto/     ElGamal pe ristretto255, dovezi ZK, board, numărare, verificatorul public (+ 45 de teste)
+packages/api/        contractul HTTP (contract/), clientul (client/), backend-ul simulat (mock/), CNP, MRZ, DG1 (identity/),
+                     formatările comune (format.ts) (+ 20 de teste)
+apps/backend/        NestJS + PostgreSQL, un folder per modul: admin, elections, trustees, registration, auth, ballots,
+                     tally, nfc, audit, system (+ 28 de teste e2e)
+apps/web/            panoul comisiei (scrutine, membri) și pagina publică: board, rezultat, verificare publică, audit Benaloh
 apps/mobile/         aplicația alegătorului (Expo + Expo Router) și modulele native modules/evoting-nfc, modules/evoting-ocr
-tools/trustee/       CLI: generarea cheii xᵢ, decriptarea parțială
+tools/trustee/       CLI: generarea cheii xᵢ (opțional criptată cu parolă), decriptarea parțială
 tools/verifier/      CLI: verificarea publică completă, auditul Benaloh
 tools/simulator/     alegeri simulate cap-coadă cu alegători sintetici și metrici de performanță
 demos/attacks/       cele cinci demonstrații de atac
 demos/macheta/       macheta inițială (MODP-2048, într-un singur fișier HTML), păstrată pentru istoric
-docs/evaluare/       rezultatele măsurate ale simulărilor
-docker-compose.yml   PostgreSQL + backend + web, pentru demo
+docs/                documentația: acest document, GHID-COMPLET.md, EXPLICATIE.md, ANALIZA.md, explicatii/, evaluare/
+infra/Caddyfile      reverse proxy-ul HTTPS pentru Docker Compose
+docker-compose.yml   PostgreSQL + backend + web + Caddy (HTTPS), pentru demo
 ```
 
 Tehnologiile, conform planului:
@@ -85,7 +88,8 @@ Tehnologiile, conform planului:
 | Web | React 19, Vite, React Router |
 | Mobil | React Native 0.86, Expo SDK 57, Expo Router, `expo-secure-store`, `expo-camera`; Kotlin cu JMRTD 0.8.9 și ML Kit |
 | CLI | Node.js ≥ 22 |
-| Infrastructură | Docker Compose |
+| Infrastructură | Docker Compose, nginx, Caddy (HTTPS), GitHub Actions |
+| Calitate | `oxlint`, `prettier`, `node:test` |
 
 ---
 
@@ -102,10 +106,18 @@ Tehnologiile, conform planului:
 ```bash
 npm install                 # instalează toate pachetele monorepo-ului (fără aplicația mobilă)
 npm run build               # construiește pachetele, backend-ul, CLI-urile și site-ul
-npm test                    # 35 + 11 teste unitare și 17 teste end-to-end pe PostgreSQL
+npm run lint && npm run format:check
+npm test                    # 45 + 20 de teste unitare și 28 de teste end-to-end pe PostgreSQL
 ```
 
-Testele end-to-end folosesc baza `postgres://evoting:evoting@localhost:5432/evoting_test`, sau variabila `TEST_DATABASE_URL`. Dacă baza nu e disponibilă, sunt sărite cu un mesaj. Pentru a o crea:
+Testele end-to-end folosesc baza `postgres://evoting:evoting@localhost:5432/evoting_test`, sau variabila `TEST_DATABASE_URL`. Dacă baza nu e disponibilă, sunt sărite cu un mesaj. Testele **golesc** baza la fiecare rulare. Cel mai simplu, cu Docker:
+
+```bash
+docker run -d --name evoting-test -p 5433:5432 -e POSTGRES_USER=evoting -e POSTGRES_PASSWORD=evoting -e POSTGRES_DB=evoting_test postgres:16-alpine
+TEST_DATABASE_URL=postgres://evoting:evoting@localhost:5433/evoting_test npm test
+```
+
+Sau, cu un PostgreSQL instalat local:
 
 ```bash
 sudo -u postgres psql -c "CREATE ROLE evoting LOGIN PASSWORD 'evoting' CREATEDB"
@@ -115,7 +127,7 @@ sudo -u postgres psql -c "CREATE DATABASE evoting_test OWNER evoting"
 
 ### 3.3 Fără server: backend-ul simulat
 
-Fără nicio configurare, site-ul și aplicația mobilă folosesc un backend simulat în memorie (`packages/api/src/mock.ts`). Are aceleași reguli ca serverul și **criptografie reală**: chei de trustee cu dovezi, buletine verificate, agregat și decriptări parțiale. Are trei scrutine de test și „Unelte de test” care țin locul trustees și al alegătorilor.
+Fără nicio configurare, site-ul și aplicația mobilă folosesc un backend simulat în memorie (`packages/api/src/mock/`). Are aceleași reguli ca serverul și **criptografie reală**: chei de trustee cu dovezi, buletine verificate, agregat și decriptări parțiale. Are trei scrutine de test și „Unelte de test” care țin locul trustees și al alegătorilor.
 
 ```bash
 npm run dev -w @evoting/web            # http://localhost:5173
@@ -138,15 +150,31 @@ Apoi îndrepți clienții spre server:
 - web: `VITE_API_URL=http://localhost:3000` în `apps/web/.env.local`, apoi `npm run dev -w @evoting/web`;
 - mobil: `EXPO_PUBLIC_API_URL=http://<IP-ul calculatorului>:3000` în `apps/mobile/.env.local`. Pe telefon, `localhost` e telefonul însuși.
 
-### 3.5 Docker Compose
+Variabilele de mediu ale serverului (`apps/backend/src/config.ts`):
+
+| Variabila | Implicit | Rol |
+| --- | --- | --- |
+| `DATABASE_URL`, `CNP_HMAC_KEY`, `ADMIN_TOKEN` | obligatorii | Baza de date; cheia HMAC (≥ 32 de octeți hex); token-ul rădăcină al comisiei (≥ 16 caractere). |
+| `SESSION_SECRET` | generat la pornire | Semnează sesiunile alegătorilor; necesar pentru reporniri fără sesiuni pierdute și pentru mai multe instanțe. |
+| `CSCA_DIR` | – | Certificatele CSCA de încredere (fără el, NFC e refuzat). |
+| `CORS_ORIGINS` | toate originile | Originile permise în browser; în producție, serverul avertizează dacă lipsește. |
+| `RATE_LIMIT`, `SENSITIVE_RATE_LIMIT` | `on`, 30 | Limitarea de rată și limita strictă pe minut, per IP. |
+| `AUTO_CLOSE_INTERVAL_MS` | 60000 | Cât de des închide serverul scrutinele ajunse la `closesAt` (0 = deloc). |
+| `TRUST_PROXY` | 0 | Numărul de proxy-uri din față (Caddy = 1), ca IP-ul real să vină din `X-Forwarded-For`. |
+| `DATABASE_SSL`, `DATABASE_CA` | automat, – | SSL spre bază (pornit implicit pentru servere nelocale); cu CA-ul dat, certificatul bazei se verifică. |
+| `PORT`, `NODE_ENV` | 3000, – | Portul; `production` pornește avertismentele de configurare. |
+
+### 3.5 Docker Compose (cu HTTPS)
 
 ```bash
-cp .env.example .env     # completează CNP_HMAC_KEY și ADMIN_TOKEN
+cp .env.example .env     # completează CNP_HMAC_KEY, ADMIN_TOKEN și SESSION_SECRET
 docker compose up --build
-# web: http://localhost:8080   API: http://localhost:3000
+# https://localhost (site, API la /api, prin Caddy)   direct: web http://localhost:8080, API http://localhost:3000
 ```
 
-Compose pornește PostgreSQL, backend-ul (care aplică singur migrările și, pentru demo, generează un PKI de test în volumul `pki`) și site-ul servit de nginx.
+Compose pornește patru containere: PostgreSQL, backend-ul (care aplică singur migrările și, pentru demo, generează un PKI de test în volumul `pki`), site-ul servit de nginx și **Caddy**, reverse proxy-ul HTTPS (`infra/Caddyfile`). Pentru `localhost`, Caddy emite un certificat local, deci browserul cere o confirmare la prima vizită; certificatul rădăcină se poate instala din `docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt .`. Pentru un domeniu real: `SITE_ADDRESS`, `PUBLIC_API_URL` și `CORS_ORIGINS` în `.env`, iar din `Caddyfile` se scoate `tls internal`; Caddy obține singur certificatul Let's Encrypt.
+
+Pe 18 noiembrie 2026, tot sistemul a fost pornit astfel și un scrutin complet a trecut prin HTTPS, cu limitarea de rată activă: creare, chei, import, înregistrare, vot, închidere, decriptare, rezultat corect și verificare publică. Răspunsurile API-ului au antetele de securitate (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`), iar HTTP e redirecționat spre HTTPS.
 
 ### 3.6 Aplicația mobilă cu NFC și OCR
 
@@ -170,11 +198,13 @@ Exemplul de mai jos rulează pe backend-ul real. Același flux merge și în mod
 
 ### Pasul 1: comisia creează scrutinul
 
-1. Pe site, **Comisie**: introduci token-ul comisiei (`ADMIN_TOKEN`). Rămâne doar în tab-ul curent, iar încercările greșite repetate primesc `429`.
-2. **Scrutin nou**: titlu, interval, candidați (ordinea definește poziția în vectorul de vot) și trustees.
-3. După creare, pagina afișează **o singură dată** comanda fiecărui trustee, cu token-ul lui. Serverul păstrează doar `SHA-256(token)` (tabela `trustees.token_hash`).
+1. Pe site, **Comisie**: introduci token-ul comisiei (`ADMIN_TOKEN`, „rădăcina”) sau token-ul tău de membru. Rămâne doar în tab-ul curent, iar încercările greșite repetate primesc `429`.
+2. *(Opțional)* **Membri**: creezi membri ai comisiei cu nume și rol: `comisie` (poate face orice) sau `observator` (vede tot, inclusiv jurnalul, dar nu schimbă nimic). Fiecare primește un token propriu, afișat o singură dată; serverul păstrează doar `SHA-256(token)` (tabela `commission_members`). Un membru se poate revoca. Jurnalul de audit reține numele (`comisie:Maria Pop`).
+3. **Scrutin nou**: titlu, interval, candidați (ordinea definește poziția în vectorul de vot), opțional **votul alb** (o opțiune în plus, ultima) și trustees.
+4. După creare, pagina afișează **o singură dată** comanda fiecărui trustee, cu token-ul lui. Serverul păstrează doar `SHA-256(token)` (tabela `trustees.token_hash`).
+5. Cât timp scrutinul e în configurare, comisia îi poate modifica titlul, intervalul, candidații și votul alb, sau îl poate șterge. Trustees nu se schimbă (au primit deja token-urile).
 
-În cod: `ElectionsService.create` (`apps/backend/src/elections/elections.service.ts`), ruta `POST /elections`.
+În cod: `ElectionsService.create`, `update`, `remove` (`apps/backend/src/elections/elections.service.ts`), `MembersService` și guard-urile din `apps/backend/src/admin/`, rutele `POST /elections`, `PATCH` și `DELETE /elections/:id`, `/admin/members`.
 
 ### Pasul 2: fiecare trustee își generează cheia
 
@@ -184,19 +214,20 @@ Pe calculatorul trustee-ului:
 npx evoting-trustee keygen --api http://localhost:3000 --election <ID> --trustee <ID>-t1 --token <TOKEN>
 ```
 
-- CLI-ul alege local un scalar aleator xᵢ și îl salvează în `<trustee>.trustee-key.json`, cu permisiuni 600. Fișierul se scrie înainte de trimitere, ca cheia să nu se poată pierde.
+- CLI-ul alege local un scalar aleator xᵢ și îl salvează în `<trustee>.trustee-key.json`, cu permisiuni 600. Fișierul se scrie înainte de trimitere, ca cheia să nu se poată pierde, și nu se suprascrie niciodată.
+- Cu `--encrypt` (parola cerută în terminal) sau `--password` / `TRUSTEE_KEY_PASSWORD`, cheia secretă din fișier e criptată: cheia de criptare se derivează din parolă cu **scrypt**, iar xᵢ se criptează cu **AES-256-GCM**, care detectează și orice modificare a fișierului. `decrypt` cere apoi parola (`tools/trustee/src/key-file.ts`).
 - Pe server pleacă doar **Yᵢ = xᵢG** și o **dovadă Schnorr** că trustee-ul cunoaște xᵢ, legată de scrutin și de trustee.
 - Serverul verifică dovada. Când au trimis toți, publică cheia scrutinului **Y = Y₁ + … + Yₙ**.
 
-În cod: `tools/trustee/src/cli.ts`, `generateTrusteeKey` și `verifyTrusteeKey` (`packages/crypto/src/trustee.ts`), `ElectionsService.submitTrusteeKey`.
+În cod: `tools/trustee/src/commands/keygen.ts`, `generateTrusteeKey` și `verifyTrusteeKey` (`packages/crypto/src/trustee.ts`), `TrusteesService.submitKey` (`apps/backend/src/trustees/trustees.service.ts`).
 
 ### Pasul 3: lista eligibililor și deschiderea votului
 
 1. Comisia importă un CSV cu un CNP pe linie (de exemplu din evidența universității).
-2. Serverul validează fiecare CNP (format, dată, județ, cifra de control), calculează `HMAC-SHA256(k, CNP)` și **aruncă imediat valoarea în clar**. În răspuns apar doar numerele liniilor invalide, mascate.
-3. **Deschide votul** e permis doar dacă toate cheile trustees au sosit și lista nu e goală.
+2. Serverul validează fiecare CNP (format, dată, județ, cifra de control), calculează `HMAC-SHA256(k, CNP)` și **aruncă imediat valoarea în clar**. În răspuns apar doar numerele liniilor invalide, mascate. Importul e permis și după deschidere (un student înmatriculat târziu se poate înregistra imediat).
+3. **Deschide votul** e permis doar dacă toate cheile trustees au sosit, lista nu e goală și data închiderii nu a trecut. Comisia poate deschide înainte de `opensAt`, dar votul tot se primește doar în intervalul `[opensAt, closesAt]`.
 
-În cod: `ElectionsService.importEligible`, `cnpHmac` (`packages/crypto/src/hash.ts`), `checkCnp` (`packages/api/src/cnp.ts`).
+În cod: `ElectionsService.importEligible`, `cnpHmac` (`packages/crypto/src/hash.ts`), `checkCnp` (`packages/api/src/identity/cnp.ts`).
 
 ### Pasul 4: alegătorul se înregistrează
 
@@ -217,7 +248,9 @@ Din aplicație: **Înregistrează-te**, apoi una din două variante.
 3. Serverul face **Passive Authentication**: semnătura SOD-ului până la certificatul CSCA de încredere și hash-ul DG1 (§6.3).
 4. Serverul extrage CNP-ul din DG1 și continuă ca la varianta A.
 
-În cod: `apps/mobile/src/app/scrutin/[id]/ocr.tsx` și `nfc.tsx`, `VotingService.registerOcr` și `registerNfc`, `verifyPassiveAuth` (`apps/backend/src/nfc/passive-auth.ts`).
+**Re-înregistrarea.** Dacă alegătorul își schimbă telefonul (sau șterge aplicația) înainte să voteze, se înregistrează din nou: serverul șterge credentialul vechi și provocările lui și păstrează noul credential (`replacedPrevious: true`, `voter.reregister` în jurnal). Două reguli: după vot nu se mai poate, iar o înregistrare NFC nu poate fi înlocuită de una OCR (nivel de încredere mai mic).
+
+În cod: `apps/mobile/src/app/scrutin/[id]/ocr.tsx` și `nfc.tsx`, `RegistrationService.registerOcr`, `registerNfc` și `register` (`apps/backend/src/registration/registration.service.ts`), `verifyPassiveAuth` (`apps/backend/src/nfc/passive-auth.ts`).
 
 ### Pasul 5: votul
 
@@ -227,10 +260,10 @@ Din aplicație: **Înregistrează-te**, apoi una din două variante.
 4. **Trimite votul:**
    - aplicația cere o provocare (`POST /auth/challenge`), o semnează cu credentialul și primește o sesiune de 10 minute (`POST /auth/verify`);
    - trimite buletinul (`POST /elections/:id/ballots`);
-   - serverul verifică: scrutin deschis, credential înregistrat și care n-a mai votat, semnătură validă, dovezi valide;
-   - adaugă buletinul pe board și întoarce **codul de urmărire**.
+   - serverul verifică: scrutin deschis și ora în intervalul `[opensAt, closesAt]`, semnătură și dovezi valide (în afara tranzacției), apoi, cu rândul scrutinului blocat, credential înregistrat și care n-a mai votat;
+   - ia ora primirii abia după blocare, ca orele să urmeze ordinea de pe board (și niciodată mai devreme decât intrarea anterioară), adaugă buletinul pe board și întoarce **codul de urmărire**.
 
-În cod: `apps/mobile/src/app/scrutin/[id]/vot.tsx`, `encryptBallot` și `verifyBallot` (`packages/crypto/src/ballot.ts`), `VotingService.cast`.
+În cod: `apps/mobile/src/app/scrutin/[id]/vot.tsx`, `encryptBallot` și `verifyBallot` (`packages/crypto/src/ballot.ts`), `BallotsService.cast` (`apps/backend/src/ballots/ballots.service.ts`).
 
 ### Pasul 6: alegătorul își verifică votul
 
@@ -241,7 +274,7 @@ Pe ecranul **Verifică votul** (sau pe site, în tab-ul Bulletin board) se caut�
 ### Pasul 7: închiderea și hash-ul publicat independent
 
 1. În timpul votului, comisia publică periodic hash-ul ultimei intrări (`SEQ:HASH`, afișat în panou) pe un canal independent, de exemplu site-ul facultății. Dacă serverul ar rescrie ulterior istoria, verificatorul ar observa nepotrivirea.
-2. **Închide votul:** serverul calculează criptotextele **agregate** per candidat și le publică (`elections.aggregate`, `GET /elections/:id/tally`).
+2. **Închiderea:** la `closesAt`, serverul închide singur scrutinul (`AutoCloseService`, la fiecare minut; în jurnal, actorul `server` cu `automatic: true`); comisia îl poate închide și mai devreme, manual. În ambele cazuri, serverul calculează criptotextele **agregate** per candidat și le publică (`elections.aggregate`, `GET /elections/:id/tally`).
 
 ### Pasul 8: trustees decriptează
 
@@ -329,7 +362,7 @@ Perechea (ΣAⱼ, ΣBⱼ − G) trebuie să cripteze 0, adică ΣAⱼ = R·G și
 k aleator, T₁ = kG, T₂ = kY, c = H(context, G, Y, U, V, T₁, T₂), s = k + c·R
 ```
 
-**c) Contextul Fiat-Shamir** al unui buletin e (ID-ul scrutinului, cheia Y, numărul de candidați, credentialul alegătorului, poziția candidatului). O dovadă copiată în alt scrutin sau pentru alt credential nu mai verifică. Testele confirmă asta în `packages/crypto/test/crypto.test.ts` și în e2e.
+**c) Contextul Fiat-Shamir** al unui buletin e (ID-ul scrutinului, cheia Y, numărul de candidați, credentialul alegătorului, poziția candidatului). O dovadă copiată în alt scrutin sau pentru alt credential nu mai verifică. Testele confirmă asta în `packages/crypto/test/ballot.test.ts` și în e2e.
 
 Ce prind dovezile, testat explicit:
 
@@ -347,7 +380,7 @@ Ce prind dovezile, testat explicit:
 
 - Credentialul e o pereche **Ed25519**, generată pe telefon (`credential.ts`).
 - Buletinul se semnează peste `SHA-256(JSON canonic al {electionId, credentialPubkey, ciphertexts, proofs})`. JSON-ul canonic are cheile sortate, deci dă același hash în orice limbaj (`encoding.ts`).
-- Autentificarea: serverul trimite un nonce de 32 de octeți. Telefonul semnează `evoting/v1/auth|scrutin|credential|nonce`, iar serverul emite o sesiune HMAC fără stare, valabilă 10 minute. Provocarea expiră în 2 minute și se consumă la prima încercare (`voting.service.ts`, `common/security.ts`).
+- Autentificarea: serverul trimite un nonce de 32 de octeți. Telefonul semnează `evoting/v1/auth|scrutin|credential|nonce`, iar serverul emite o sesiune HMAC fără stare, valabilă 10 minute. Provocarea stă în tabela `auth_challenges` (deci supraviețuiește unei reporniri și e văzută de toate instanțele serverului), expiră în 2 minute și se consumă la prima încercare, prin `DELETE … RETURNING` (`auth/auth.service.ts`, `common/security.ts`).
 
 ### 5.6 Bulletin board-ul
 
@@ -362,6 +395,7 @@ prevHashₖ  = hashₖ₋₁   (prima intrare: un hash „genesis” derivat din
 - **Codul de urmărire** e hashₖ. Depinde de tot istoricul, deci o modificare a unui buletin anterior l-ar schimba.
 - În PostgreSQL, tabela `ballots` are un **trigger** care respinge `UPDATE` și `DELETE`.
 - Adăugarea pe board e serializată prin `SELECT … FOR UPDATE` pe rândul scrutinului, iar un vot dublu e oprit și de constrângerea `UNIQUE (election_id, credential_pubkey)`. Testul trimite două voturi simultane cu același credential și doar unul intră.
+- `receivedAt` se ia **după** blocare și nu poate fi mai devreme decât al intrării anterioare (`boardTime`, `ballots.service.ts`), deci orele de pe board urmează ordinea intrărilor chiar și cu voturi simultane sau cu mai multe instanțe ale serverului. Testul trimite 16 voturi deodată și verifică orele și verificatorul.
 
 Fișiere: `board.ts`, `migrations/001_init.sql`.
 
@@ -388,7 +422,7 @@ Tⱼ ≤ numărul de buletine, deci se află prin **baby-step giant-step** în O
 | Pas | Ce verifică |
 | --- | --- |
 | 0. Cheile | Dovada Schnorr a fiecărui Yᵢ și Y = ΣYᵢ |
-| 1. Lanțul | Pozițiile 1..n, prevHash, ballotHash recalculat, hash-ul intrării; opțional hash-ul publicat independent |
+| 1. Lanțul | Pozițiile 1..n, prevHash, ballotHash recalculat, hash-ul intrării; orele primirii valide, crescătoare și în intervalul `[opensAt, closesAt]`; opțional hash-ul publicat independent |
 | 2. Credentialele | Fiecare credential e înregistrat (lista publică, fără identitate), votează o singură dată, semnătura e validă |
 | 3. Dovezile ZK | Dovezile 0/1 și ale sumei, pentru fiecare buletin |
 | 4. Agregatul | Recalculat de la zero și comparat cu cel publicat |
@@ -406,14 +440,14 @@ Fiecare eroare are un loc exact: „buletinul #42”, „trustee-ul t2, candidat
 
 ### 6.1 CNP-ul
 
-- Validare completă (`packages/api/src/cnp.ts`): 13 cifre, prima cifră (sex și secol), dată existentă, județ 01–52 sau 70, cifra de control cu cheia 279146358279.
+- Validare completă (`packages/api/src/identity/cnp.ts`): 13 cifre, prima cifră (sex și secol), dată existentă, județ 01–52 sau 70, cifra de control cu cheia 279146358279.
 - Serverul păstrează doar `HMAC-SHA256(k, CNP)`. Cheia k (`CNP_HMAC_KEY`) stă în mediul serverului, niciodată în baza de date. Testul e2e caută fiecare CNP în toate tabelele și nu-l găsește.
 - De ce HMAC și nu SHA-256: spațiul CNP-urilor e mic, deci SHA-256 se sparge prin căutare (demonstrația 1). Exemplul măsurat: un CNP găsit în 68 ms dacă se știe data nașterii; toți cei născuți în 2000–2007 în ~18 minute pe un singur nucleu.
 - Jurnalul de audit nu conține HMAC-uri, ca un credential să nu poată fi legat de o persoană prin jurnal.
 
 ### 6.2 MRZ-ul (OCR)
 
-`packages/api/src/mrz.ts` acceptă trei formate:
+`packages/api/src/identity/mrz.ts` acceptă trei formate (MRZ-urile de test se construiesc în `mrz-build.ts`):
 
 | Format | Document | Structură |
 | --- | --- | --- |
@@ -444,30 +478,37 @@ Fiecare eroare are un loc exact: „buletinul #42”, „trustee-ul t2, candidat
 
 ## 7. Backend-ul: tabele, rute, reguli
 
-### 7.1 Cele nouă tabele (`apps/backend/migrations/001_init.sql`)
+### 7.1 Cele unsprezece tabele (`apps/backend/migrations/`)
+
+Migrarea `001_init.sql` creează primele nouă tabele și trigger-ul append-only, `002_rls.sql` pornește Row Level Security, iar `003_settings_members_challenges.sql` adaugă coloana `candidates.kind` și tabelele `commission_members` și `auth_challenges`. Migrările se aplică automat la pornire, o singură dată fiecare (`schema_migrations`).
 
 | Tabelă | Conținut | Observații |
 | --- | --- | --- |
 | `elections` | titlu, stare, interval, cheia publică Y, agregatul | stări: draft → open → closed → tallied |
-| `candidates` | nume, descriere, poziție | poziția = indicele în vectorul de vot |
+| `candidates` | nume, descriere, poziție, `kind` (`candidate` sau `blank`) | poziția = indicele în vectorul de vot; votul alb e ultimul |
 | `trustees` | nume, hash-ul token-ului, Yᵢ, dovada Schnorr | niciodată xᵢ |
 | `eligible_voters` | `cnp_hmac` | populată la import |
 | `registrations` | `cnp_hmac` (unic), credential (unic), metodă, nivel de încredere | singura legătură cu identitatea e HMAC-ul |
 | `ballots` | criptotexte, dovezi, semnătură, ballot_hash, prev_hash, hash, received_at | append-only (trigger), un vot per credential |
 | `partial_decryptions` | Dᵢⱼ și dovezile | un rând per trustee |
 | `results` | totaluri, număr de buletine | public |
-| `audit_log` | actor, acțiune, payload, oră | acțiunile comisiei, ale trustees și ale serverului |
+| `audit_log` | actor, acțiune, payload, oră | acțiunile comisiei (cu numele membrului), ale trustees și ale serverului |
+| `commission_members` | nume, rol (`comisie` / `observator`), hash-ul token-ului, data revocării | token-ul în clar se arată o singură dată |
+| `auth_challenges` | credentialul, nonce-ul, expirarea | provocările de autentificare, consumate la prima folosire |
 
 ### 7.2 Rutele
 
 | Metodă | Rută | Cine | Protecție |
 | --- | --- | --- | --- |
 | GET | `/elections`, `/elections/:id` | oricine | – |
-| GET | `/elections/:id/board`, `/board/:hash`, `/board-head` | oricine | – |
+| GET | `/elections/:id/board`, `/board/page?page=&size=`, `/board/:hash`, `/board-head` | oricine | – |
 | GET | `/elections/:id/registrations`, `/tally`, `/result`, `/audit-bundle` | oricine | – |
-| POST | `/elections` | comisia | token comisie, limită de rată |
-| POST | `/elections/:id/eligible` (text/csv), `/open`, `/close` | comisia | token comisie |
-| GET | `/elections/:id/audit-log`, `/admin/check` | comisia | token comisie, limită strictă |
+| POST | `/elections` | comisia | rolul `comisie` |
+| PATCH, DELETE | `/elections/:id` (doar în `draft`) | comisia | rolul `comisie` |
+| POST | `/elections/:id/eligible` (text/csv), `/open`, `/close` | comisia | rolul `comisie` |
+| GET | `/elections/:id/audit-log`, `/admin/members` | comisia | orice rol (și observatorii) |
+| GET | `/admin/check` | comisia | orice rol, limită strictă |
+| POST, DELETE | `/admin/members`, `/admin/members/:id` | comisia | rolul `comisie` (creare cu limită strictă) |
 | POST | `/elections/:id/trustees` | CLI trustee | token trustee, limită strictă |
 | POST | `/elections/:id/tally/partial` | CLI trustee | token trustee, limită strictă |
 | POST | `/elections/:id/register/ocr`, `/register/nfc` | aplicația | limită strictă |
@@ -485,14 +526,18 @@ Limitarea de rată:
 
 | Acțiune | Permisă când |
 | --- | --- |
-| Trimiterea cheilor de trustee, importul eligibililor | `draft` |
-| Deschiderea | `draft`, cu toate cheile primite și lista nevidă |
-| Înregistrarea | `draft` sau `open` |
-| Votul | `open` |
+| Modificarea și ștergerea scrutinului, trimiterea cheilor de trustee | `draft` |
+| Importul eligibililor | `draft` sau `open` |
+| Deschiderea | `draft`, cu toate cheile primite, lista nevidă și `closesAt` în viitor |
+| Înregistrarea | `draft` sau `open`; re-înregistrarea doar înainte de vot și fără a coborî nivelul de încredere |
+| Votul | `open` și ora curentă în `[opensAt, closesAt]` |
+| Închiderea | `open`: manual, de comisie, sau automat, de server, la `closesAt` |
 | Decriptarea parțială | `closed`, după publicarea agregatului |
 | Rezultatul | publicat automat după ultima decriptare; starea devine `tallied` |
 
 Politica de revot (întrebare deschisă în plan) e implementată ca **un singur vot per credential**.
+
+Răspunsurile au antetele de securitate puse de `helmet` (HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy`, fără `X-Powered-By`).
 
 ---
 
@@ -501,17 +546,23 @@ Politica de revot (întrebare deschisă în plan) e implementată ca **un singur
 | Amenințare | Măsură implementată | Unde se vede |
 | --- | --- | --- |
 | Serverul modifică sau șterge buletine | lanț de hash-uri, trigger append-only, hash publicat independent, cod de urmărire | e2e „administrator rău-intenționat”, demonstrația 5 |
-| Vot invalid (2 voturi, vot negativ) | dovezi ZK verificate de server și de verificator | `crypto.test.ts`, e2e |
-| Rezultat falsificat | agregat recalculabil, dovezi de decriptare | `crypto.test.ts` („rezultat falsificat”) |
+| Vot invalid (2 voturi, vot negativ) | dovezi ZK verificate de server și de verificator | `ballot.test.ts`, e2e |
+| Rezultat falsificat | agregat recalculabil, dovezi de decriptare | `verifier.test.ts` („rezultat falsificat”) |
 | Un trustee decriptează un vot individual | cheie n-din-n; CLI-ul verifică agregatul înainte să decripteze | `trustee.ts`, `tools/trustee` |
-| Un trustee trimite o decriptare falsă | dovadă Chaum-Pedersen per Dᵢⱼ | e2e, `crypto.test.ts` |
+| Un trustee trimite o decriptare falsă | dovadă Chaum-Pedersen per Dᵢⱼ | e2e, `trustee.test.ts` |
 | Furtul bazei expune CNP-uri | HMAC cu cheie în afara bazei | e2e „CNP-urile nu apar”, demonstrația 1 |
 | Buletin fals (MRZ printat) | nivel „optic” marcat separat; NFC cu Passive Authentication | e2e NFC (DG1 modificat, CSCA străin, semnătură alterată) |
 | Cip clonat | Chip Authentication | **neimplementat** (§11) |
-| Reutilizarea unei dovezi sau a unui buletin | Fiat-Shamir legat de scrutin și credential, semnătura credentialului | `crypto.test.ts`, e2e |
+| Reutilizarea unei dovezi sau a unui buletin | Fiat-Shamir legat de scrutin și credential, semnătura credentialului | `ballot.test.ts`, e2e |
 | Brute force pe autentificare | limitare de rată, comparații în timp constant | e2e „limitarea de rată”, demonstrația 4 |
-| Aplicație compromisă criptează alt vot | provocarea Benaloh | `crypto.test.ts`, ecranul de audit |
-| Ballot stuffing de către server | buletine semnate de credentiale din lista publică, număr public de înregistrări | `crypto.test.ts` („ballot stuffing”); acoperire **parțială** |
+| Aplicație compromisă criptează alt vot | provocarea Benaloh | `ballot.test.ts`, ecranul de audit |
+| Ballot stuffing de către server | buletine semnate de credentiale din lista publică, număr public de înregistrări | `verifier.test.ts` („ballot stuffing”); acoperire **parțială** |
+| Buletin strecurat după închidere sau antedatat | serverul refuză votul în afara intervalului și închide singur la `closesAt`; verificatorul cere ore crescătoare și în interval | `interval.e2e`, `verifier.test.ts` („timpii primirii”) |
+| Acțiuni anonime în comisie, observator care modifică | membri cu token propriu și rol, numele în jurnal, revocare | `commission.e2e` |
+| Trafic interceptat | HTTPS prin Caddy, HSTS (`helmet`) | Compose verificat cap-coadă |
+| Fișierul de cheie al unui trustee furat | criptat cu parolă (scrypt + AES-256-GCM), opțional | `cli.e2e` |
+| Înlocuirea credentialului altcuiva prin re-înregistrare | doar înainte de vot, nu sub nivelul de încredere existent, vizibilă în jurnal; la nivelul optic, riscul rămâne pentru cine are datele MRZ ale persoanei | `election-flow.e2e`; acoperire **parțială** |
+| Toți trustees se înțeleg să decripteze un buletin | nicio măsură tehnică: trustees din tabere diferite | presupunere: cel puțin un trustee onest |
 | Constrângere, cumpărarea voturilor | nicio măsură | limitare asumată |
 
 ---
@@ -547,9 +598,9 @@ Rezultate obținute la rulare:
 
 | Suită | Teste | Ce acoperă |
 | --- | --- | --- |
-| `packages/crypto` | 35 | JSON canonic, HMAC (vector RFC 4231), ElGamal, homomorfism, BSGS, buletine valide și toate tipurile de buletine invalide, refolosirea dovezilor, Benaloh, trustees, verificatorul pe 11 tipuri de manipulare |
-| `packages/api` | 11 | CNP, MRZ (exemplele ICAO TD1 și TD2, buletin vechi, CEI, zgomot OCR), DG1, scrutin complet pe backend-ul simulat |
-| `apps/backend` | 17 | Pe PostgreSQL real: tot fluxul, token-uri, NFC cu PKI de test, autentificare, buletine invalide, vot dublu simultan, trigger append-only, agregat, trustee care trișează, verificatorul, CNP absent din bază, manipulare directă în bază, jurnal de audit, limitare de rată |
+| `packages/crypto` | 45 | Pe fișiere: `encoding` (JSON canonic, HMAC cu vectorul RFC 4231, hex strict), `elgamal` (criptare, randomizare, homomorfism, BSGS), `ballot` (buletine valide, toate tipurile de buletine invalide, refolosirea dovezilor, forma, Benaloh), `trustee` (chei, decriptare, trustee care trișează), `verifier` (13 tipuri de manipulare, inclusiv ore în afara ordinii sau a intervalului, scrutin deschis, progres) |
+| `packages/api` | 20 | `cnp` (validare, format, generator), `mrz` (exemplele ICAO TD1 și TD2, buletin vechi, CEI, zgomot OCR, text fără MRZ), `dg1` (împachetare, DG1 invalid, base64), `mock` (scrutin complet, scrutinele de demonstrație, re-înregistrare, vot alb, modificare și ștergere, interval și închidere automată, uneltele de test și membrii) |
+| `apps/backend` | 28 | Pe PostgreSQL real: `election-flow.e2e` (16: tot fluxul, token-uri, import și după deschidere, re-înregistrare, NFC cu PKI de test, autentificare, buletine invalide, vot dublu simultan, trigger append-only, paginare, agregat, trustee care trișează, verificatorul, CNP absent din bază, manipulare directă în bază, jurnal de audit), `interval.e2e` (5: vot înainte de deschidere, deschidere după închidere, 16 voturi simultane cu ore crescătoare, ceasuri diferite, închiderea automată), `commission.e2e` (3: membri și roluri, modificare și ștergere, vot alb), `rate-limit.e2e` (3) și `cli.e2e` (1: `evoting-trustee` cu cheie criptată și necriptată, `evoting-verify` online și offline, ca procese separate) |
 
 Pe lângă acestea, verificări manuale:
 
@@ -587,6 +638,8 @@ Toate măsurătorile sunt pe un singur calculator, unde clientul, serverul și P
 - Validarea unui buletin pe server (semnătură + dovezi) durează ~25 ms de CPU. Un singur proces Node validează deci ~40 de buletine pe secundă. Pentru alegerile unei facultăți e suficient: 10.000 de voturi într-o zi înseamnă sub 0,2 voturi pe secundă în medie.
 - Timpul de criptare de pe un telefon Android real e o metrică din plan care rămâne de măsurat pe dispozitiv. În browser, pe build-ul web al aplicației, criptarea a durat ~9 ms.
 
+**Remăsurat pe 18 noiembrie**, pe codul final (interval aplicat, provocări în bază, ora luată după blocare), cu 1.000 de alegători, pe un PC cu Windows și PostgreSQL în Docker Desktop (`docs/evaluare/simulare-1000-18-nov.json`): rezultatul a fost exact, iar verificatorul, inclusiv verificarea orelor, a trecut cu 8 alegători în paralel. Timpii au fost cu 25–30% mai mari la toate metricile (criptare 24,1 ms, trimitere 270 ms, 14,3 buletine/s, verificare 32,9 ms per buletin), inclusiv la cele care rulează doar local (criptarea, verificarea), deci diferența vine de la calculator, nu de la modificări.
+
 ---
 
 ## 11. Limitări și ce rămâne de făcut
@@ -601,11 +654,16 @@ Spus deschis, ce **nu** a putut fi verificat sau implementat aici:
 4. **Pozițiile CNP-ului în MRZ** urmează structura cunoscută a buletinului vechi; pentru CEI sunt o presupunere. Parserul acceptă doar CNP-uri valide și consistente cu data nașterii, dar trebuie confirmat pe documente reale.
 5. **Motorul OCR** e ML Kit (alternativa din plan), nu Tesseract.
 6. **Cheia de credential** stă în SecureStore, criptată cu o cheie din Android Keystore. Nu e o cheie Ed25519 nativă a Keystore-ului: Ed25519 e suportat în Keystore abia din Android 13, iar semnarea se face în JavaScript.
-7. **Docker Compose** a fost validat sintactic (`docker compose config`), dar build-ul complet nu a rulat aici: Docker Hub a răspuns cu 429 la descărcarea imaginilor. Backend-ul și site-ul au fost testate direct, fără containere.
-8. **Schema n-din-n:** dacă un trustee își pierde cheia, rezultatul nu se mai poate decripta. Varianta t-din-n (Pedersen DKG) rămâne extensie.
+7. **Docker Compose** a rulat cap-coadă pe 18 noiembrie 2026 (§3.5). Certificatul pentru `localhost` e unul local, emis de Caddy, deci browserul cere o confirmare.
+8. **Schema n-din-n:** dacă un trustee își pierde cheia, rezultatul nu se mai poate decripta. Varianta t-din-n (Pedersen DKG) rămâne extensie. În schimb, toți trustees împreună ar putea decripta orice buletin: secretul presupune cel puțin un trustee onest.
 9. **Ballot stuffing:** serverul controlează și înregistrarea. Soluția completă e o autoritate de înregistrare separată, ca în Belenios.
 10. **Constrângerea și cumpărarea voturilor** nu sunt tratate, la fel ca în Helios.
 11. **Securitate de producție:** codul criptografic nu e auditat independent, iar implementarea folosește BigInt în JavaScript, nu cod în timp constant la nivel de procesor. E potrivit pentru o lucrare de licență și un demo, nu pentru alegeri cu miză mare.
+12. **Mai multe instanțe ale serverului:** provocările sunt în baza de date, iar sesiunile funcționează dacă toate instanțele au același `SESSION_SECRET`, dar contoarele limitării de rată sunt în memoria fiecărei instanțe.
+13. **Nivelul optic și re-înregistrarea:** cine are datele MRZ ale unei persoane îi poate înlocui credentialul înainte ca aceasta să voteze (vizibil în jurnal). O setare per scrutin „doar NFC” ar elimina riscul.
+14. **Pachetul de audit** se descarcă întreg (~22 MB la 10.000 de buletine); board-ul e paginat doar pentru afișare.
+
+Starea fiecărui punct din analiza de pe 16 noiembrie (ce s-a rezolvat, ce rămâne) e în [ANALIZA.md, secțiunea 5](ANALIZA.md#5-ce-s-a-rezolvat-după-analiză-1718-noiembrie).
 
 ---
 
@@ -638,6 +696,9 @@ Detaliile despre Helios și Belenios trebuie verificate în documentația lor of
 | **HMAC** | Hash cu cheie secretă: fără cheie, amprenta nu se poate recalcula. |
 | **MRZ** | Machine Readable Zone, rândurile cu „<<<” de pe act. |
 | **PACE** | Protocolul care deschide canalul securizat cu cipul. |
+| **Observator** | Membru al comisiei care vede tot (inclusiv jurnalul), dar nu poate schimba nimic. |
 | **Passive Authentication** | Verificarea semnăturii statului pe datele cipului. |
 | **Provocarea Benaloh** | Auditul unui buletin prin dezvăluirea numerelor aleatoare. |
+| **Re-înregistrare** | Înlocuirea credentialului unei persoane care n-a votat încă, la același nivel de încredere sau mai mare. |
 | **Trustee** | Deținătorul unei părți din cheia de decriptare. |
+| **Vot alb** | Opțiunea „niciun candidat”, criptată ca oricare alta și afișată separat în rezultat. |

@@ -63,12 +63,12 @@ Comunicarea e mereu **cerere → răspuns**:
 
 ## 3.2 Cine face cererile, în cod
 
-Toate cererile trec prin aceeași interfață, `ApiClient` (`packages/api/src/types.ts`). Ea are două implementări:
+Toate cererile trec prin aceeași interfață, `ApiClient` (`packages/api/src/contract/client.ts`). Ea are două implementări:
 
 | Implementare | Fișier | Ce face |
 | --- | --- | --- |
-| **Clientul HTTP** | `packages/api/src/http.ts` | Trimite cereri reale la server, cu `fetch`. |
-| **Backend-ul simulat** | `packages/api/src/mock.ts` | Nu trimite nimic pe rețea; face aceleași verificări în memorie, cu criptografie reală. |
+| **Clientul HTTP** | `packages/api/src/client/http.ts` | Trimite cereri reale la server, cu `fetch`. |
+| **Backend-ul simulat** | `packages/api/src/mock/` (starea, regulile, scrutinele de demonstrație, clientul și uneltele de test, în fișiere separate) | Nu trimite nimic pe rețea; face aceleași verificări în memorie, cu criptografie reală. |
 
 Telefonul și site-ul aleg una dintre ele în `src/api/index.ts`:
 
@@ -104,32 +104,40 @@ res = await fetch(root + path, { method, headers, body: JSON.stringify(body) })
 | Metodă | Rută | Cine o folosește | Ce face | Protecție |
 | --- | --- | --- | --- | --- |
 | GET | `/health` | monitorizare, Docker | Răspunde `{"ok":true}` dacă serverul trăiește. | – |
-| GET | `/admin/check` | site (login comisie) | 204 dacă token-ul comisiei e corect. | token comisie, limită strictă |
+| GET | `/admin/check` | site (login comisie) | Întoarce cine e autentificat: `{ id, name, role }`. | token comisie sau de membru, limită strictă |
+| GET | `/admin/members` | comisia, observatorii | Lista membrilor comisiei (fără token-uri). | orice membru |
+| POST | `/admin/members` | comisia | Creează un membru cu nume și rol; întoarce token-ul lui o singură dată. | rolul `comisie`, limită strictă |
+| DELETE | `/admin/members/:id` | comisia | Revocă un membru. | rolul `comisie` |
 | GET | `/elections` | toți | Lista scrutinelor. | – |
-| GET | `/elections/:id` | toți | Un scrutin: candidați, trustees, cheia publică, statistici. | – |
-| GET | `/elections/:id/board` | toți | Toate buletinele criptate de pe board. | – |
+| GET | `/elections/:id` | toți | Un scrutin: candidați (inclusiv votul alb), trustees, cheia publică, intervalul, statistici. | – |
+| GET | `/elections/:id/board` | arhivare | Toate buletinele criptate de pe board. | – |
+| GET | `/elections/:id/board/page?page=1&size=50` | site | O pagină din board, cele mai noi intrări primele. | – |
 | GET | `/elections/:id/board/:hash` | alegătorul | Caută un buletin după codul de urmărire. | – |
 | GET | `/elections/:id/board-head` | comisia, public | Ultima amprentă a board-ului, de publicat independent. | – |
 | GET | `/elections/:id/registrations` | verificatorul | Credentialele înregistrate, fără identitate. | – |
 | GET | `/elections/:id/tally` | trustees | Totalurile criptate (agregatul). | – |
 | GET | `/elections/:id/result` | toți | Rezultatul final. | – |
 | GET | `/elections/:id/audit-bundle` | verificatorul | Tot ce e public, într-un singur pachet. | – |
-| POST | `/elections` | comisia | Creează un scrutin; întoarce token-urile trustees, o singură dată. | token comisie |
-| POST | `/elections/:id/eligible` | comisia | Importă lista CSV de CNP-uri eligibile; se salvează doar HMAC-urile. | token comisie |
-| POST | `/elections/:id/open` | comisia | Deschide votul. | token comisie |
-| POST | `/elections/:id/close` | comisia | Închide votul și calculează agregatul. | token comisie |
-| GET | `/elections/:id/audit-log` | comisia | Jurnalul acțiunilor. | token comisie |
+| POST | `/elections` | comisia | Creează un scrutin; întoarce token-urile trustees, o singură dată. | rolul `comisie` |
+| PATCH | `/elections/:id` | comisia | Modifică titlul, intervalul, candidații sau votul alb (doar în configurare). | rolul `comisie` |
+| DELETE | `/elections/:id` | comisia | Șterge scrutinul (doar în configurare). | rolul `comisie` |
+| POST | `/elections/:id/eligible` | comisia | Importă lista CSV de CNP-uri eligibile, în configurare sau cu votul deschis; se salvează doar HMAC-urile. | rolul `comisie` |
+| POST | `/elections/:id/open` | comisia | Deschide votul (cu toate cheile, lista nevidă și data închiderii în viitor). | rolul `comisie` |
+| POST | `/elections/:id/close` | comisia | Închide votul și calculează agregatul (la `closesAt` o face și serverul, singur). | rolul `comisie` |
+| GET | `/elections/:id/audit-log` | comisia, observatorii | Jurnalul acțiunilor. | orice membru |
 | POST | `/elections/:id/trustees` | `tools/trustee keygen` | Trustee-ul trimite cheia publică și dovada. | token trustee, limită strictă |
 | POST | `/elections/:id/tally/partial` | `tools/trustee decrypt` | Trustee-ul trimite decriptarea parțială. | token trustee, limită strictă |
-| POST | `/elections/:id/register/ocr` | telefon | Înregistrare cu CNP-ul citit optic. | limită strictă |
-| POST | `/elections/:id/register/nfc` | telefon | Înregistrare cu DG1 și SOD de pe cip. | limită strictă |
-| POST | `/auth/challenge` | telefon | Cere o provocare (nonce) de semnat. | limită strictă |
+| POST | `/elections/:id/register/ocr` | telefon | Înregistrare (sau re-înregistrare, înainte de vot) cu CNP-ul citit optic. | limită strictă |
+| POST | `/elections/:id/register/nfc` | telefon | Înregistrare (sau re-înregistrare) cu DG1 și SOD de pe cip. | limită strictă |
+| POST | `/auth/challenge` | telefon | Cere o provocare (nonce) de semnat; se păstrează în tabela `auth_challenges`. | limită strictă |
 | POST | `/auth/verify` | telefon | Trimite semnătura și primește o sesiune de 10 minute. | limită strictă |
-| POST | `/elections/:id/ballots` | telefon | Trimite buletinul criptat. | sesiune semnată |
+| POST | `/elections/:id/ballots` | telefon | Trimite buletinul criptat; acceptat doar între `opensAt` și `closesAt`. | sesiune semnată |
+
+„Token comisie” înseamnă `ADMIN_TOKEN` (rădăcina) sau token-ul unui membru. Rolul `comisie` poate face orice; rolul `observator` doar citește (lista, jurnalul).
 
 **Limitarea de rată:** în general, 600 de cereri pe minut per adresă IP. Pe rutele marcate „limită strictă”, 30 pe minut. Asta face imposibilă ghicirea unui token prin încercări repetate (demonstrația `api-bruteforce.ts`).
 
-**CORS** (Cross-Origin Resource Sharing): browserul refuză implicit ca o pagină de pe `localhost:5173` să trimită cereri la `localhost:3000`, pentru că sunt „origini” diferite. Serverul spune explicit ce origini accepta prin `app.enableCors(...)`. Implicit le acceptă pe toate, iar cu `CORS_ORIGINS` în `.env` le poți restrânge.
+**CORS** (Cross-Origin Resource Sharing): browserul refuză implicit ca o pagină de pe `localhost:5173` să trimită cereri la `localhost:3000`, pentru că sunt „origini” diferite. Serverul spune explicit ce origini acceptă prin `app.enableCors(...)`. Implicit le acceptă pe toate, iar cu `CORS_ORIGINS` în `.env` le poți restrânge; în producție, serverul avertizează dacă lipsește. În Docker Compose, prin Caddy, site-ul și API-ul sunt pe aceeași origine (`https://localhost` și `https://localhost/api`), deci CORS nici nu mai intervine.
 
 ## 3.4 Un scrutin complet, cerere cu cerere
 
@@ -153,19 +161,21 @@ Content-Type: application/json
 
 Serverul:
 
-1. `AdminGuard` compară token-ul cu `ADMIN_TOKEN` **în timp constant** (`safeEqual`), ca un atacator să nu poată deduce literele corecte după cât durează răspunsul.
+1. `CommissionGuard` (prin `AdminGuard`) compară token-ul cu `ADMIN_TOKEN` **în timp constant** (`safeEqual`), ca un atacator să nu poată deduce literele corecte după cât durează răspunsul; dacă nu e acesta, caută `SHA-256(token)` printre membrii comisiei nerevocați și cere rolul `comisie`. Numele membrului ajunge în jurnal ca actor.
 2. `ElectionsService.create` validează datele, generează câte un token aleator pentru fiecare trustee și salvează în tabela `trustees` doar **SHA-256-ul** token-ului.
 3. Răspunde 201 cu scrutinul și token-urile în clar. Site-ul le afișează o singură dată, iar comisia le dă trustees.
+
+Corpul poate conține și `"allowBlank": true`: atunci serverul adaugă la final opțiunea „Vot alb”. Cât timp scrutinul e în configurare, `PATCH /elections/<id>` îl modifică, iar `DELETE /elections/<id>` îl șterge.
 
 ### Pasul 2. Fiecare trustee își trimite cheia (`tools/trustee`)
 
 Trustee-ul rulează pe calculatorul lui:
 
 ```bash
-npx evoting-trustee keygen --api http://localhost:3000 --election <id> --trustee <id-trustee> --token <token-trustee> --out cheie.json
+npx evoting-trustee keygen --api http://localhost:3000 --election <id> --trustee <id-trustee> --token <token-trustee> --out cheie.json --encrypt
 ```
 
-Programul generează `x₁` și îl scrie în `cheie.json`, apoi trimite doar partea publică:
+Programul generează `x₁` și îl scrie în `cheie.json` (cu `--encrypt`, criptat cu o parolă cerută în terminal), apoi trimite doar partea publică:
 
 ```http
 POST /elections/<id>/trustees
@@ -194,7 +204,7 @@ Pentru fiecare rând, serverul validează CNP-ul, calculează `HMAC(CNP_HMAC_KEY
 POST /elections/<id>/open
 ```
 
-Deschiderea e refuzată dacă lipsește vreo cheie de trustee sau lista e goală.
+Deschiderea e refuzată dacă lipsește vreo cheie de trustee, lista e goală sau data închiderii a trecut. Importul merge și după deschidere, pentru cei adăugați târziu.
 
 ### Pasul 4. Ana se înregistrează (telefon)
 
@@ -221,7 +231,7 @@ Serverul, într-o **tranzacție**:
 1. pentru NFC, face întâi Passive Authentication și extrage CNP-ul din DG1;
 2. calculează HMAC(CNP) și verifică dacă e în `eligible_voters` (dacă nu, răspunde 403);
 3. inserează în `registrations`: HMAC-ul, cheia publică, metoda și nivelul de încredere;
-4. dacă HMAC-ul există deja, constrângerea `UNIQUE` pică și răspunde 409, „Persoana este deja înregistrată”.
+4. dacă persoana e deja înregistrată și **n-a votat**, credentialul vechi se înlocuiește (re-înregistrare, de exemplu de pe alt telefon), dar nu cu un nivel de încredere mai mic (OCR peste NFC); dacă a votat, răspunde 409.
 
 Răspunsul (201):
 
@@ -277,15 +287,17 @@ Authorization: Bearer eyJlbGVjdGlvbklk….Xk3p…
 { …buletinul de la 5a… }
 ```
 
-Serverul (`VotingService.cast`):
+Serverul (`BallotsService.cast`, în `apps/backend/src/ballots/ballots.service.ts`):
 
 1. verifică sesiunea și că aparține aceluiași scrutin și credential;
-2. verifică semnătura și toate dovezile, **în afara tranzacției**, pentru că durează ~25 ms și n-ar trebui să țină board-ul blocat;
-3. deschide o tranzacție și **blochează rândul scrutinului** (`SELECT … FOR UPDATE`), ca două voturi să nu fie adăugate în același timp pe aceeași poziție;
-4. verifică din nou că scrutinul e deschis, că credentialul e înregistrat și că n-a mai votat;
-5. citește ultima intrare de pe board (de exemplu, #41);
-6. construiește intrarea #42, cu `prevHash` = hash-ul lui #41, și calculează hash-ul ei;
-7. o inserează și face `COMMIT`.
+2. verifică faptul că ora curentă e între `opensAt` și `closesAt` (altfel 409);
+3. verifică semnătura și toate dovezile, **în afara tranzacției**, pentru că durează ~25 ms și n-ar trebui să țină board-ul blocat;
+4. deschide o tranzacție și **blochează rândul scrutinului** (`SELECT … FOR UPDATE`), ca două voturi să nu fie adăugate în același timp pe aceeași poziție;
+5. verifică din nou că scrutinul e deschis, că credentialul e înregistrat și că n-a mai votat;
+6. citește ultima intrare de pe board (de exemplu, #41);
+7. ia **ora primirii abia acum**, după blocare (niciodată mai devreme decât a lui #41), ca orele să urmeze ordinea de pe board, și verifică din nou intervalul;
+8. construiește intrarea #42, cu `prevHash` = hash-ul lui #41, și calculează hash-ul ei;
+9. o inserează și face `COMMIT`.
 
 Răspunsul (201):
 
@@ -310,6 +322,8 @@ POST /elections/<id>/close
 ```
 
 Serverul adună criptotextele fiecărui candidat de pe toate buletinele și salvează **agregatul** (3 criptotexte: totalul criptat pentru A, B și C).
+
+Comisia poate apăsa „Închide votul” oricând; dacă n-o face, la `closesAt` serverul închide singur scrutinul (verifică la fiecare minut), iar în jurnal apare actorul `server`. După `closesAt`, `POST /ballots` primește `409 Votul s-a încheiat`.
 
 ### Pasul 8. Trustees decriptează
 

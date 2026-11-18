@@ -16,7 +16,7 @@ Proiectul rezolvă ambele probleme cu **criptografie**: votul pleacă de pe tele
 | Actor | Cine e în realitate | Ce face în sistem |
 | --- | --- | --- |
 | **Alegătorul** | Studentul sau angajatul care votează | Se înregistrează cu buletinul, votează din aplicație, își verifică votul. |
-| **Comisia** | Comisia electorală a facultății | Creează scrutinul, încarcă lista celor care au drept de vot, deschide și închide votul. Folosește site-ul și se autentifică cu un token secret (`ADMIN_TOKEN`). |
+| **Comisia** | Comisia electorală a facultății | Creează scrutinul, încarcă lista celor care au drept de vot, deschide și închide votul. Folosește site-ul și se autentifică cu un token secret: `ADMIN_TOKEN` („rădăcina”) sau token-ul propriu al fiecărui membru. Membrii au rolul `comisie` (pot face orice) sau `observator` (doar citesc), iar jurnalul de audit reține cine ce a făcut. |
 | **Trustees** | 2–5 persoane de încredere (de exemplu, un profesor, un student, un reprezentant al sindicatului) | Fiecare ține o bucată din cheia care deschide rezultatul. Rezultatul se poate afla doar dacă toți își folosesc bucata. |
 | **Serverul** | Programul din `apps/backend`, care rulează pe un calculator | Primește cererile, verifică totul, ține evidența în baza de date. Nu e considerat de încredere: tot ce face poate fi verificat. |
 | **Publicul / auditorul** | Oricine | Descarcă datele publice și rulează verificatorul. |
@@ -83,9 +83,10 @@ Un **nonce** e un număr aleator folosit o singură dată. La autentificare, ser
 
 ### Token
 
-Un șir lung, aleator, care funcționează ca o parolă generată de calculator. În proiect există trei feluri:
+Un șir lung, aleator, care funcționează ca o parolă generată de calculator. În proiect există patru feluri:
 
-- **token-ul comisiei** (`ADMIN_TOKEN`), pus în `.env`;
+- **token-ul comisiei** (`ADMIN_TOKEN`), pus în `.env`: „rădăcina”, cu care se creează membrii;
+- **token-urile membrilor comisiei**, câte unul pentru fiecare membru, afișate o singură dată la creare;
 - **token-urile trustees**, generate la crearea scrutinului și afișate o singură dată;
 - **token-ul de sesiune al alegătorului**, primit după autentificare și valabil 10 minute.
 
@@ -174,7 +175,7 @@ Telefonul nu știe dinainte dacă vei verifica sau vei trimite. O aplicație car
 
 ### CNP
 
-Codul numeric personal, 13 cifre. Proiectul îl validează complet (`packages/api/src/cnp.ts`): sexul și secolul, o dată de naștere care există, județul și cifra de control calculată cu cheia `279146358279`.
+Codul numeric personal, 13 cifre. Proiectul îl validează complet (`packages/api/src/identity/cnp.ts`): sexul și secolul, o dată de naștere care există, județul și cifra de control calculată cu cheia `279146358279`.
 
 ### MRZ
 
@@ -210,9 +211,9 @@ Un scrutin trece prin patru stări, în ordine:
 
 | Stare | Ce înseamnă | Ce se poate face |
 | --- | --- | --- |
-| `draft` | În configurare | Trustees își trimit cheile, comisia încarcă lista de eligibili, alegătorii se pot înregistra. |
-| `open` | Deschis | Alegătorii se înregistrează și votează. |
-| `closed` | Închis | Nu se mai votează. Serverul a calculat și a publicat totalurile criptate. Trustees decriptează. |
+| `draft` | În configurare | Comisia poate modifica sau șterge scrutinul, trustees își trimit cheile, comisia încarcă lista de eligibili, alegătorii se pot înregistra. |
+| `open` | Deschis | Alegătorii se înregistrează și votează, dar votul se primește doar între ora de deschidere și cea de închidere. Comisia mai poate adăuga eligibili. |
+| `closed` | Închis | Nu se mai votează. Comisia a închis votul sau, la ora închiderii, l-a închis serverul singur. Serverul a calculat și a publicat totalurile criptate. Trustees decriptează. |
 | `tallied` | Numărat | Rezultatul e publicat. Oricine poate verifica. |
 
 ## 1.9 Verificatorul public
@@ -222,7 +223,7 @@ E un program (`packages/crypto/src/verify.ts`, folosit de `tools/verifier` și d
 | Pas | Ce verifică |
 | --- | --- |
 | 0 | Cheia fiecărui trustee are dovadă validă, iar cheia scrutinului e suma lor. |
-| 1 | Lanțul de hash-uri e intact, fără intrări schimbate, șterse sau mutate. |
+| 1 | Lanțul de hash-uri e intact, fără intrări schimbate, șterse sau mutate; orele de primire sunt crescătoare și în intervalul scrutinului. |
 | 2 | Fiecare buletin vine de la un credential înregistrat, câte unul per credential, cu semnătură validă. |
 | 3 | Dovezile zero-knowledge ale fiecărui buletin sunt valide. |
 | 4 | Totalurile criptate se potrivesc cu suma buletinelor. |
@@ -236,3 +237,6 @@ Dacă serverul ar minți la oricare pas, verificatorul spune exact unde, de exem
 - **Ballot stuffing de către server**: serverul controlează și înregistrarea, deci teoretic ar putea înregistra alegători falși. Numărul public de înregistrări îl face vizibil, dar soluția completă ar fi o autoritate de înregistrare separată.
 - **Clonarea cipului**: ar necesita Chip Authentication, care nu e implementată.
 - **Codul nu e auditat** de experți externi. E potrivit pentru o licență și o demonstrație, nu pentru alegeri naționale.
+- **Toți trustees împreună** ar putea decripta orice buletin. Secretul votului presupune că cel puțin unul e onest; de aceea se aleg din tabere diferite.
+- **Pierderea unei chei de trustee** blochează rezultatul (schema n-din-n). Fișierul de cheie se poate cripta cu o parolă și păstra în copii.
+- **Nivelul „optic”** (OCR) acceptă și un buletin fals bine printat; la acest nivel, cine are datele MRZ ale cuiva îi poate înlocui credentialul înainte ca acela să voteze (se vede în jurnal).

@@ -24,7 +24,7 @@ E un sistem de **vot electronic** pentru alegeri universitare. Alegătorul se id
 
 1. **Aplicația de telefon** (`apps/mobile`): alegătorul se înregistrează cu buletinul, votează și își verifică votul.
 2. **Site-ul** (`apps/web`): comisia electorală creează scrutinul, încarcă lista de alegători, deschide și închide votul. Publicul vede rezultatele și poate verifica tot.
-3. **Serverul** (`apps/backend`): primește cererile de la telefon și de la site, verifică totul și salvează în baza de date (Supabase).
+3. **Serverul** (`apps/backend`): primește cererile de la telefon și de la site, verifică totul și salvează în baza de date (PostgreSQL local sau Supabase).
 
 Pe lângă ele mai sunt: biblioteca de criptografie comună (`packages/crypto`), stratul comun de comunicare (`packages/api`), programele în linia de comandă pentru trustees, verificare și simulare (`tools/`) și demonstrațiile de atac (`demos/`).
 
@@ -33,3 +33,5 @@ Pe lângă ele mai sunt: biblioteca de criptografie comună (`packages/crypto`),
 - [DOCUMENTATIE.md](../DOCUMENTATIE.md): documentația tehnică, cu formule, modelul de amenințare și rezultatele. E scrisă pentru lucrarea de licență.
 - [EXPLICATIE.md](../EXPLICATIE.md): istoria construcției, pas cu pas, și descrierea tehnică a fiecărui fișier.
 - Acest folder: aceleași lucruri, dar explicate de la zero, fără să presupună că știi ceva dinainte.
+- [GHID-COMPLET.md](../GHID-COMPLET.md): tot ce e în acest folder, la zi (inclusiv funcțiile adăugate pe 17–18 nov.: interval aplicat, vot alb, re-înregistrare, membrii comisiei, HTTPS), într-un singur fișier, plus întrebări și răspunsuri pentru susținere.
+- [ANALIZA.md](../ANALIZA.md): ce e bun, ce nu, ce s-a rezolvat și ce urmează.

@@ -24,7 +24,7 @@
 | **Autentificare** | Dovedirea identității. Alegătorul se autentifică semnând un nonce. |
 | **Baby-step giant-step (BSGS)** | Algoritmul care află un număr mic `t` din punctul `t·G`, în ~√t pași. |
 | **Backend** | Partea de server a unui sistem. Aici, `apps/backend`. |
-| **Backend simulat (mock)** | Varianta în memorie a serverului, din `packages/api/src/mock.ts`. |
+| **Backend simulat (mock)** | Varianta în memorie a serverului, din `packages/api/src/mock/`. |
 | **Base64 / base64url** | Codificare care transformă octeți în litere, cifre și câteva simboluri, ca să poată sta în JSON sau într-o adresă. |
 | **Bază de date** | Programul care păstrează datele organizat. Aici, PostgreSQL. |
 | **Bearer** | Felul în care se trimite un token: antetul `Authorization: Bearer <token>`. |
@@ -38,6 +38,7 @@
 | **Bulletin board (board)** | Registrul public al buletinelor criptate, legate prin hash-uri. |
 | **Buletin (ballot)** | Votul criptat al unui alegător: criptotexte, dovezi și semnătură. |
 | **Cache** | Memorie temporară pentru rezultate deja calculate, ca să nu fie recalculate. |
+| **Caddy** | Server web care face HTTPS automat. În Docker Compose stă în fața site-ului și a serverului (`infra/Caddyfile`): `https://localhost` pentru site, `/api` pentru server. |
 | **CAN** | Card Access Number: 6 cifre de pe cartea de identitate electronică, necesare pentru PACE. |
 | **CEI** | Cartea electronică de identitate, cu cip. |
 | **Cerere (request)** | Mesajul trimis de un client către server. |
@@ -110,10 +111,12 @@
 | **Hash (amprentă)** | Rezultatul unei funcții care transformă orice text într-o amprentă scurtă, fixă, imposibil de inversat. |
 | **Header (antet)** | O informație despre cerere, de forma `Nume: valoare`. |
 | **Healthcheck** | Verificarea periodică a stării unui container. |
+| **Helmet** | Bibliotecă pentru Express care adaugă antetele de securitate HTTP (HSTS, `nosniff`, `X-Frame-Options` etc.); un rând în `apps/backend/src/app.ts`. |
 | **Hermes** | Motorul JavaScript al aplicațiilor React Native. |
 | **Hex (hexazecimal)** | Scrierea numerelor cu `0–9` și `a–f`. |
 | **HMAC** | Hash cu cheie secretă. |
 | **Hook** | Funcție React care începe cu `use` (`useState`, `useEffect`, `useAsync`). |
+| **HSTS** | Antetul `Strict-Transport-Security`: îi spune browserului să folosească pentru acest site doar HTTPS. |
 | **HTTP** | Protocolul prin care clienții și serverele comunică. |
 | **ICAO** | Organizația Aviației Civile Internaționale, care a standardizat MRZ-ul și cipurile documentelor. |
 | **Imagine Docker** | Pachetul cu program + tot ce-i trebuie, din care se pornesc containere. |
@@ -137,6 +140,7 @@
 | **Metro** | Împachetatorul de cod al aplicațiilor React Native. |
 | **Migrare** | Un fișier SQL care modifică structura bazei, aplicat o singură dată, în ordine. |
 | **ML Kit** | Biblioteca Google de recunoaștere a textului, care rulează pe telefon. |
+| **Membru al comisiei** | O persoană din comisie, cu nume, rol (`comisie` sau `observator`) și token propriu, creată din panou. Jurnalul de audit reține numele ei. |
 | **Mock** | Varianta simulată a ceva real. |
 | **Modul (Nest)** | Lista componentelor unei aplicații NestJS. |
 | **Modul nativ** | Cod Kotlin (Android) chemat din JavaScript. |
@@ -154,6 +158,7 @@
 | **npm** | Managerul de pachete al Node. |
 | **`npm ci`** | Instalare exactă, după `package-lock.json`. |
 | **Obiect** | O colecție de câmpuri cu nume: `{ title: 'Senat', status: 'open' }`. |
+| **Observator** | Membru al comisiei cu drept doar de citire: vede scrutinele și jurnalul, dar nu poate schimba nimic. |
 | **OCR** | Recunoașterea textului dintr-o imagine. |
 | **Octet (byte)** | 8 biți; un număr de la 0 la 255. |
 | **OpenSSL** | Biblioteca de criptografie folosită de Node pentru certificate. |
@@ -174,6 +179,7 @@
 | **Port** | „Ușa” pe care ascultă un program: 3000 serverul, 5173 site-ul în dezvoltare, 8080 site-ul în Docker, 5432 PostgreSQL. |
 | **PostgreSQL** | Baza de date folosită. |
 | **Primary key** | Identificatorul unic al unui rând dintr-o tabelă. |
+| **Prettier** | Unealtă care formatează automat codul la fel peste tot (`npm run format`); CI-ul verifică formatarea cu `npm run format:check`. |
 | **Promise** | O valoare care va veni mai târziu. |
 | **Props** | Parametrii unei componente React. |
 | **Provider / Service** | Clasa NestJS cu logica propriu-zisă. |
@@ -182,10 +188,12 @@
 | **Push** | Trimiterea commit-urilor tale pe GitHub. |
 | **`Q`** | Numărul de elemente al grupului (un număr prim de ~252 de biți). |
 | **`r` (randomness)** | Numărul aleator folosit la o criptare. |
+| **Re-înregistrare** | Înlocuirea credentialului unei persoane care n-a votat încă (de exemplu după schimbarea telefonului); nu e permisă după vot și nici cu un nivel de încredere mai mic. |
 | **React** | Biblioteca pentru interfețe. |
 | **React Native** | React pentru aplicații de telefon. |
 | **React Router** | Navigarea după adresă, pe site. |
 | **`reflect-metadata`** | Bibliotecă necesară decoratorilor NestJS. |
+| **Reverse proxy** | Un server care primește cererile în locul altora și le trimite mai departe (aici, Caddy în fața site-ului și a serverului). |
 | **Regex** | Șablon de căutare în text. |
 | **Repository (repo)** | Folderul proiectului urmărit de Git, cu toată istoria. |
 | **Răspuns (response)** | Mesajul trimis de server înapoi clientului. |
@@ -228,6 +236,7 @@
 | **Validare** | Verificarea datelor primite înainte de folosire. |
 | **Variabilă de mediu** | O setare dată programului din afară, de exemplu din `.env`. |
 | **Verificator public** | Programul care reface toate verificările din datele publice. |
+| **Vot alb** | Opțiunea „niciun candidat”: un candidat special (`kind = 'blank'`), criptat ca oricare altul și afișat separat în rezultat. |
 | **Vite** | Unealta de dezvoltare și build a site-ului. |
 | **Volum Docker** | Folder care supraviețuiește ștergerii containerului. |
 | **Workflow** | O automatizare GitHub Actions, descrisă în YAML. |

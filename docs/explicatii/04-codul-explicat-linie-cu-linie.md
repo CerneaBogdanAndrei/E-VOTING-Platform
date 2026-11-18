@@ -159,7 +159,7 @@ const challenge = await api.authChallenge(electionId, credential.publicKey)
 
 ```ts
 @Injectable()
-export class VotingService {
+export class AuthService {
   private readonly challenges = new Map<string, PendingChallenge>()
   constructor(private readonly db: Database) {}
   async cast(...) { … this.db.transaction(…) … }
@@ -386,10 +386,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const cnpHmacKey = env.CNP_HMAC_KEY!.toLowerCase()
   if (!/^[0-9a-f]{64,}$/.test(cnpHmacKey)) throw new Error('CNP_HMAC_KEY trebuie să aibă cel puțin 32 de octeți, în hex …')
   if (env.ADMIN_TOKEN!.length < 16) throw new Error('ADMIN_TOKEN trebuie să aibă cel puțin 16 caractere')
+  const production = env.NODE_ENV === 'production'
+  if (production && !env.SESSION_SECRET) {
+    console.warn('SESSION_SECRET lipsește: sesiunile alegătorilor nu supraviețuiesc unei reporniri …')
+  }
 ```
 
 - Cheia HMAC trebuie să fie hex de cel puțin 64 de caractere (32 de octeți). O cheie scurtă ar putea fi ghicită.
 - Token-ul comisiei trebuie să aibă cel puțin 16 caractere.
+- În producție (`NODE_ENV=production`, cum e în Docker Compose), lipsa lui `SESSION_SECRET` produce un avertisment.
 
 ```ts
   return {
@@ -402,14 +407,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: env.CORS_ORIGINS ? env.CORS_ORIGINS.split(',').map((s) => s.trim()) : true,
     rateLimit: env.RATE_LIMIT !== 'off',
     sensitiveLimit: Number(env.SENSITIVE_RATE_LIMIT || 30),
+    autoCloseIntervalMs: env.AUTO_CLOSE_INTERVAL_MS === undefined ? 60_000 : Number(env.AUTO_CLOSE_INTERVAL_MS),
+    trustProxy: env.TRUST_PROXY === 'true' ? 1 : Number(env.TRUST_PROXY || 0) || 0,
+    production,
   }
 ```
 
-- `sessionSecret`: dacă nu e dat, se generează unul aleator la fiecare pornire. Consecință: la repornire, sesiunile de 10 minute deschise expiră. E acceptabil.
+- `sessionSecret`: dacă nu e dat, se generează unul aleator la fiecare pornire. Consecință: la repornire, sesiunile de 10 minute deschise expiră, iar două instanțe ale serverului n-ar recunoaște una sesiunile celeilalte.
 - `cscaDir`: folderul cu certificatele de încredere pentru NFC, sau `null`.
 - `port`: 3000 dacă nu e dat.
 - `corsOrigins`: lista originilor permise, sau `true` (toate).
 - `rateLimit`: pornit, cu excepția cazului `RATE_LIMIT=off` (doar pentru simulări).
+- `autoCloseIntervalMs`: la câte milisecunde verifică serverul dacă vreun scrutin deschis a ajuns la ora închiderii (implicit un minut; 0 = niciodată, folosit de teste).
+- `trustProxy`: câte proxy-uri sunt în fața serverului (Caddy = 1), ca adresa IP reală a clientului să fie citită din antetul `X-Forwarded-For`. Fără ea, în spatele lui Caddy toate cererile ar părea venite de la aceeași adresă, iar limitarea de rată i-ar bloca pe toți deodată.
 
 ## B.3 Construirea aplicației: `apps/backend/src/app.ts`
 
@@ -420,7 +430,8 @@ Trebuie importat primul, ca decoratorii Nest să funcționeze.
 
 ```ts
 export async function createApp(config: AppConfig, { logger = true }: { logger?: boolean } = {}) {
-  await migrate(config.databaseUrl, logger ? (m) => console.log(m) : undefined)
+  const log = logger ? (m: string) => console.log(m) : () => undefined
+  await migrate(config.databaseUrl, log)
 ```
 Înainte de orice, aplică migrările bazei (creează tabelele, dacă lipsesc). Testele trimit `logger: false`, ca să nu umple ecranul.
 
@@ -434,6 +445,13 @@ export async function createApp(config: AppConfig, { logger = true }: { logger?:
 Setează limita strictă de rată și creează aplicația Nest din modulul principal. Body parser-ul implicit e oprit, pentru că urmează să fie configurat manual.
 
 ```ts
+  app.use(helmet({ contentSecurityPolicy: false }))
+  if (config.trustProxy) app.set('trust proxy', config.trustProxy)
+```
+- `helmet` adaugă la fiecare răspuns antetele de securitate: `Strict-Transport-Security` (browserul folosește doar HTTPS pentru acest site), `X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Referrer-Policy` și altele. `Content-Security-Policy` e oprit, pentru că API-ul întoarce doar JSON, nu pagini.
+- `trust proxy` spune lui Express să creadă antetul `X-Forwarded-For` pus de Caddy.
+
+```ts
   app.useBodyParser('json', { limit: '2mb' })
   app.useBodyParser('text', { type: ['text/csv', 'text/plain'], limit: '20mb' })
 ```
@@ -442,10 +460,15 @@ Acceptă JSON de până la 2 MB (un buletin are câțiva KB) și text/CSV de pâ
 ```ts
   app.enableCors({ origin: config.corsOrigins })
   app.enableShutdownHooks()
+  if (logger) {
+    if (config.production && config.corsOrigins === true) console.warn('CORS_ORIGINS lipsește: orice site poate chema API-ul din browser')
+    const ssl = sslWarning(config.databaseUrl)
+    if (ssl) console.warn(ssl)
+  }
   return app
 }
 ```
-Activează CORS și „cârligele de oprire”: la `Ctrl+C` sau la oprirea containerului, Nest închide frumos conexiunile la bază (`onApplicationShutdown` din `Database`).
+Activează CORS și „cârligele de oprire”: la `Ctrl+C` sau la oprirea containerului, Nest închide frumos conexiunile la bază (`onApplicationShutdown` din `Database`). La final, două avertismente pentru configurări riscante: CORS deschis oricui în producție și o conexiune SSL la bază fără verificarea certificatului (`DATABASE_CA` lipsă).
 
 ## B.4 Modulul principal: `apps/backend/src/app.module.ts`
 
@@ -468,16 +491,18 @@ export class AppModule {
 - `skipIf`: sare peste limitare dacă `RATE_LIMIT=off`.
 
 ```ts
-      controllers: [ElectionsController, AuthController, SystemController],
+      controllers: [ElectionsController, AuthController, AdminController, SystemController],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: APP_GUARD, useClass: ThrottlerGuard },
-        Database, AuditService, AdminGuard, ElectionsService, VotingService, TallyService, PassiveAuthService,
+        Database, AuditService, AdminGuard, CommissionGuard, MembersService, PassiveAuthService,
+        ElectionsRepository, ElectionsService, AutoCloseService, TrusteesService,
+        RegistrationService, AuthService, BallotsService, TallyService,
       ],
 ```
 
-- `controllers`: clasele care primesc cereri.
-- `providers`: serviciile pe care Nest le creează și le injectează.
+- `controllers`: clasele care primesc cereri (`/elections`, `/auth`, `/admin`, `/health`).
+- `providers`: serviciile pe care Nest le creează și le injectează. `AutoCloseService` pornește, la crearea aplicației, ceasul închiderii automate.
 - `{ provide: CONFIG, useValue: config }`: înregistrează obiectul de configurare sub numele `CONFIG`, ca serviciile să-l primească cu `@Inject(CONFIG)`.
 - `{ provide: APP_GUARD, useClass: ThrottlerGuard }`: aplică limitarea de rată pe **toate** rutele.
 
@@ -536,28 +561,59 @@ export function verifySession(secret: string, token: string): VoterSession | nul
 ```
 Operația inversă: desparte la punct, recalculează HMAC-ul, îl compară în timp constant, decodează datele și verifică expirarea. Orice problemă → `null` (sesiune invalidă).
 
-## B.6 Paznicul comisiei: `apps/backend/src/common/admin.guard.ts`
+## B.6 Paznicii comisiei: `apps/backend/src/admin/admin.guard.ts`
+
+```ts
+export const ROOT_ADMIN: AdminIdentity = { id: 'root', name: 'Administrator', role: 'comisie' }
+export const adminActor = (admin: AdminIdentity) => `comisie:${admin.name}`
+```
+`ADMIN_TOKEN` e „rădăcina”: cine îl folosește apare ca „Administrator”, cu rolul `comisie`. `adminActor` scrie identitatea în jurnalul de audit (`comisie:Maria Pop`).
 
 ```ts
 @Injectable()
 export class AdminGuard implements CanActivate {
-  constructor(@Inject(CONFIG) private readonly config: AppConfig) {}
-
-  canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<{ headers: Record<string, string | undefined> }>()
-    const token = bearer(req.headers.authorization)
-    if (!token || !safeEqual(token, this.config.adminToken)) {
-      throw new UnauthorizedException('Token de comisie lipsă sau greșit')
-    }
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<AdminRequest>()
+    req.admin = await this.identify(bearer(req.headers.authorization))
     return true
+  }
+
+  async identify(token: string | null): Promise<AdminIdentity> {
+    if (!token) throw new UnauthorizedException('Token de comisie lipsă sau greșit')
+    if (safeEqual(token, this.config.adminToken)) return ROOT_ADMIN
+    const { rows } = await this.db.query<AdminIdentity>(
+      'SELECT id, name, role FROM commission_members WHERE token_hash = $1 AND revoked_at IS NULL', [sha256(token)])
+    if (!rows[0]) throw new UnauthorizedException('Token de comisie lipsă sau greșit')
+    return rows[0]
   }
 }
 ```
 
-1. Primește configurarea prin injectare.
-2. `canActivate` rulează înaintea fiecărei rute marcate cu `@UseGuards(AdminGuard)`.
-3. Ia cererea HTTP, scoate token-ul din antet și îl compară în timp constant cu `ADMIN_TOKEN`.
-4. Dacă nu se potrivește, aruncă 401. Altfel, `true` = cererea poate continua.
+1. `canActivate` rulează înaintea fiecărei rute marcate cu `@UseGuards(AdminGuard)`.
+2. Scoate token-ul din antetul `Authorization: Bearer …`.
+3. Dacă e `ADMIN_TOKEN` (comparat **în timp constant**), identitatea e „Administrator”.
+4. Altfel îl caută printre membrii comisiei: în bază stă doar `SHA-256(token)`, deci serverul calculează hash-ul și caută rândul, doar printre membrii nerevocați.
+5. Dacă nu găsește nimic, 401. Dacă găsește, pune identitatea pe cerere (`req.admin`), ca s-o poată folosi ruta.
+
+```ts
+@Injectable()
+export class CommissionGuard implements CanActivate {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    await this.admin.canActivate(context)
+    const req = context.switchToHttp().getRequest<AdminRequest>()
+    if (req.admin?.role !== 'comisie') throw new ForbiddenException('Doar membrii comisiei pot face această acțiune; observatorii doar citesc')
+    return true
+  }
+}
+```
+Pentru rutele care **schimbă** ceva: face aceeași verificare, apoi cere rolul `comisie`. Un observator primește 403. Rutele care doar citesc (lista membrilor, jurnalul) folosesc `AdminGuard`, deci observatorii au acces la ele.
+
+```ts
+export const Admin = createParamDecorator((_data: unknown, ctx: ExecutionContext): AdminIdentity => {
+  return ctx.switchToHttp().getRequest<AdminRequest>().admin ?? ROOT_ADMIN
+})
+```
+Un **decorator de parametru**: în controller, `@Admin() admin: AdminIdentity` primește identitatea pusă de guard.
 
 ## B.7 Rutele: `apps/backend/src/elections/elections.controller.ts`
 
@@ -565,36 +621,52 @@ export class AdminGuard implements CanActivate {
 @Controller('elections')
 export class ElectionsController {
   constructor(
-    private readonly elections: ElectionsService,
-    private readonly voting: VotingService,
+    private readonly elections: ElectionsRepository,
+    private readonly commission: ElectionsService,
+    private readonly trustees: TrusteesService,
+    private readonly registration: RegistrationService,
+    private readonly ballots: BallotsService,
     private readonly tally: TallyService,
     private readonly audit: AuditService,
   ) {}
 ```
-Toate rutele încep cu `/elections`. Nest îi dă automat cele patru servicii.
+Toate rutele încep cu `/elections`. Nest îi dă automat cele șapte servicii.
 
 ```ts
-  @Get(':id/board')
-  board(@Param('id') id: string) {
-    return this.elections.board(id)
+  @Get(':id/board/page')
+  boardPage(@Param('id') id: string, @Query('page') page?: string, @Query('size') size?: string) {
+    const p = Math.max(1, Math.floor(Number(page) || 1))
+    const s = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(Number(size) || 100)))
+    return this.elections.boardPage(id, p, s)
+  }
+
+  @Get(':id/board/:hash')
+  findBallot(@Param('id') id: string, @Param('hash') hash: string) {
+    return this.elections.findBallot(id, hash)
   }
 ```
-`GET /elections/abc/board` → `id = 'abc'` → cere board-ul de la serviciu. Ce se întoarce devine JSON. Dacă serviciul întoarce un `Promise`, Nest așteaptă singur.
+`GET /elections/abc/board/page?page=2&size=50` → a doua pagină de câte 50 de intrări, cele mai noi primele. Numerele din adresă sunt aduse în limite sigure (pagina cel puțin 1, mărimea între 1 și 500). **Ordinea contează:** ruta `board/page` e scrisă înaintea lui `board/:hash`; altfel cuvântul „page” ar fi luat drept cod de urmărire.
 
 ```ts
+  @Patch(':id')
+  @UseGuards(CommissionGuard)
+  update(@Param('id') id: string, @Body() body: unknown, @Admin() admin: AdminIdentity) {
+    return this.commission.update(id, body, admin)
+  }
+
   @Post(':id/open')
   @HttpCode(200)
-  @UseGuards(AdminGuard)
-  open(@Param('id') id: string) {
-    return this.elections.open(id)
+  @UseGuards(CommissionGuard)
+  open(@Param('id') id: string, @Admin() admin: AdminIdentity) {
+    return this.commission.open(id, admin)
   }
 ```
-`POST /elections/abc/open`: întâi `AdminGuard`, apoi deschiderea. Răspunde 200.
+Rutele comisiei: întâi `CommissionGuard` (token valid și rolul `comisie`), apoi serviciul, care primește și identitatea, ca s-o scrie în jurnal. `@HttpCode(200)` schimbă răspunsul implicit al unui `POST` (201, „creat”) în 200.
 
 ```ts
   @Post(':id/ballots')
   castBallot(@Param('id') id: string, @Headers('authorization') auth: string | undefined, @Body() body: unknown) {
-    return this.voting.cast(id, bearer(auth), body)
+    return this.ballots.cast(id, bearer(auth), body)
   }
 ```
 Votul: ia ID-ul din adresă, token-ul de sesiune din antet și buletinul din corp, apoi le dă serviciului de vot.
@@ -642,7 +714,7 @@ export const isUniqueViolation = (err: unknown, constraint?: string) =>
 ```
 Recunoaște eroarea „există deja” (codul 23505) și, opțional, ce constrângere anume a picat. Așa serverul poate spune „ai votat deja” în loc de o eroare tehnică.
 
-## B.9 Votul: `VotingService.cast` (`apps/backend/src/voting/voting.service.ts`)
+## B.9 Votul: `BallotsService.cast` (`apps/backend/src/ballots/ballots.service.ts`)
 
 ```ts
 async cast(electionId: string, sessionToken: string | null, body: unknown): Promise<BallotReceipt> {
@@ -672,10 +744,12 @@ Sesiunea, adresa și buletinul trebuie să fie pentru același scrutin și acela
 ```ts
   const params = await this.elections.params(electionId)
   if (params.status !== 'open') throw new ConflictException('Scrutinul nu este deschis')
+  checkInterval(new Date(), params.opensAt, params.closesAt)
   const check = verifyBallot(params, ballot)
   if (!check.ok) throw bad(`Buletin respins: ${check.reason}`)
 ```
-Verificarea criptografică: semnătura Ed25519 și toate dovezile ZK. Se face **înainte** de tranzacție, pentru că durează ~25 ms, iar tranzacția blochează board-ul.
+- `checkInterval` refuză votul dacă ora curentă e înainte de `opensAt` („Votul nu a început încă”) sau după `closesAt` („Votul s-a încheiat”), ambele cu 409.
+- Verificarea criptografică: semnătura Ed25519 și toate dovezile ZK. Se face **înainte** de tranzacție, pentru că durează ~25 ms, iar tranzacția blochează board-ul.
 
 ```ts
   const entry = await this.db.transaction(async (client) => {
@@ -693,11 +767,15 @@ Verificarea criptografică: semnătura Ed25519 și toate dovezile ZK. Se face **
 Verificările se repetă **în interiorul** tranzacției (starea s-ar fi putut schimba între timp). `rowCount` = câte rânduri a găsit.
 
 ```ts
-    const last = await client.query('SELECT * FROM ballots WHERE election_id = $1 ORDER BY seq DESC LIMIT 1', [electionId])
-    const previous: BoardEntry | undefined = last.rows[0] ? toEntry(last.rows[0]) : undefined
-    const next = appendEntry(electionId, previous, ballot, new Date().toISOString())
+    const previous = await this.elections.lastEntry(client, electionId)
+    const receivedAt = boardTime(new Date(), previous)
+    checkInterval(receivedAt, e.opens_at, e.closes_at)
+    const next = appendEntry(electionId, previous, ballot, receivedAt.toISOString())
 ```
-Ia ultima intrare (sau nimic, dacă e primul vot) și construiește intrarea următoare, legată de ea prin hash.
+- Ia ultima intrare (sau nimic, dacă e primul vot).
+- **Ora primirii se ia abia acum**, cu board-ul blocat. Dacă s-ar lua înainte de blocare, două voturi sosite aproape deodată ar putea intra în ordinea inversă orelor lor (unul așteaptă la blocare, celălalt trece), iar verificatorul, care cere ore crescătoare, ar raporta fals o manipulare. `boardTime` mai are o plasă de siguranță: dacă ceasul acestei instanțe a serverului e puțin în urma celei care a scris intrarea anterioară, folosește ora anterioară, deci orele rămân crescătoare.
+- Intervalul se verifică din nou cu ora finală (verificarea dovezilor ar fi putut trece peste ora închiderii).
+- `appendEntry` construiește intrarea următoare, legată de cea anterioară prin hash.
 
 ```ts
     await client.query(`INSERT INTO ballots (…) VALUES ($1, …, $10)`, [electionId, next.seq, …, next.receivedAt])
@@ -1031,7 +1109,7 @@ CREATE TABLE registrations (
 - Fiecare înregistrare are un număr unic, crescător.
 - `cnp_hmac`: amprenta CNP-ului, **nu** CNP-ul.
 - `method` și `trust_level` pot avea doar valorile din listă.
-- `UNIQUE (election_id, cnp_hmac)`: o persoană se înregistrează o singură dată per scrutin.
+- `UNIQUE (election_id, cnp_hmac)`: o persoană are o singură înregistrare activă per scrutin. La re-înregistrare (alt telefon, înainte de vot), serverul șterge rândul vechi și îl inserează pe cel nou, în aceeași tranzacție.
 - `UNIQUE (election_id, credential_pubkey)`: un credential aparține unei singure persoane.
 - `FOREIGN KEY … REFERENCES eligible_voters`: nu te poți înregistra dacă nu ești pe lista de eligibili, nici măcar ocolind serverul.
 
@@ -1048,6 +1126,33 @@ CREATE TRIGGER ballots_append_only
 ```
 - Funcția aruncă mereu eroare; `%` e înlocuit cu `TG_OP` (`UPDATE` sau `DELETE`).
 - Trigger-ul o cheamă înainte de orice modificare sau ștergere de pe board, deci ele sunt imposibile. Testul „board-ul e append-only” încearcă exact asta și se așteaptă la eroare.
+
+Migrarea `003_settings_members_challenges.sql` adaugă trei lucruri:
+
+```sql
+ALTER TABLE candidates
+  ADD COLUMN kind text NOT NULL DEFAULT 'candidate' CHECK (kind IN ('candidate', 'blank'));
+
+CREATE TABLE commission_members (
+  id          text PRIMARY KEY,
+  name        text NOT NULL,
+  role        text NOT NULL CHECK (role IN ('comisie', 'observator')),
+  token_hash  text NOT NULL UNIQUE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  revoked_at  timestamptz
+);
+
+CREATE TABLE auth_challenges (
+  id                 text PRIMARY KEY,
+  election_id        text NOT NULL REFERENCES elections (id) ON DELETE CASCADE,
+  credential_pubkey  text NOT NULL,
+  nonce              text NOT NULL,
+  expires_at         timestamptz NOT NULL
+);
+```
+- `ALTER TABLE … ADD COLUMN` adaugă o coloană unui tabel existent; `DEFAULT 'candidate'` o completează la rândurile vechi. Votul alb e un rând cu `kind = 'blank'`.
+- `commission_members`: membrii comisiei. Ca la trustees, se păstrează doar `token_hash`; `revoked_at` gol înseamnă membru activ.
+- `auth_challenges`: provocările de autentificare. `ON DELETE CASCADE` înseamnă că, la ștergerea scrutinului, provocările lui dispar odată cu el.
 
 ## B.18 Imaginea serverului: `apps/backend/Dockerfile`
 
@@ -1163,14 +1268,60 @@ Baza locală: imaginea oficială PostgreSQL 16, utilizatorul, parola și baza, d
 - `CNP_HMAC_KEY` și `ADMIN_TOKEN` sunt obligatorii (`:?`): fără ele, `docker compose` refuză să pornească.
 - Portul 3000 din container e expus pe portul 3000 al calculatorului.
 
+Tot la `backend`, câteva variabile fixate pentru Docker:
+
+```yaml
+      NODE_ENV: production
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://localhost,http://localhost:8080}
+      TRUST_PROXY: '1'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/health || exit 1']
+```
+- `NODE_ENV: production` pornește avertismentele de configurare (de exemplu, lipsa lui `SESSION_SECRET`).
+- `CORS_ORIGINS`: doar site-ul (prin Caddy și direct) poate chema API-ul din browser.
+- `TRUST_PROXY: '1'`: serverul e în spatele lui Caddy, deci adresa reală a clientului vine din `X-Forwarded-For`.
+- Verificarea sănătății cheamă `127.0.0.1`, nu `localhost`: în container, `localhost` înseamnă adresa IPv6 `::1`, iar serverul ascultă pe IPv4, deci Docker l-ar fi marcat „unhealthy” deși funcționa.
+
 ```yaml
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+        VITE_API_URL: ${PUBLIC_API_URL:-https://localhost/api}
     ports:
-      - "8080:80"
+      - '8080:80'
 ```
-Site-ul: construit cu adresa API-ului „văzută din browser” (`localhost:3000`, nu `backend:3000`, pentru că browserul rulează pe calculatorul tău, nu în rețeaua Docker) și expus pe portul 8080.
+Site-ul: construit cu adresa API-ului „văzută din browser” (`https://localhost/api`, prin Caddy, nu `backend:3000`, pentru că browserul rulează pe calculatorul tău, nu în rețeaua Docker) și expus și direct, pe portul 8080.
+
+```yaml
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    ports:
+      - '443:443'
+      - '80:80'
+```
+**Caddy**, reverse proxy-ul cu HTTPS: primește cererile pe 443 (iar pe 80 le redirecționează spre HTTPS), citește configurarea din `infra/Caddyfile` (montată doar pentru citire, `:ro`) și păstrează certificatele în volumul `caddy_data`. `infra/Caddyfile`:
+
+```
+{$SITE_ADDRESS:localhost} {
+	tls internal
+	encode gzip
+	handle_path /api/* {
+		reverse_proxy backend:3000
+	}
+	handle {
+		reverse_proxy web:80
+	}
+}
+```
+- `{$SITE_ADDRESS:localhost}`: adresa site-ului, din mediu, implicit `localhost`.
+- `tls internal`: certificat emis de o autoritate locală a lui Caddy (pentru demo). Pentru un domeniu real se scoate rândul, iar Caddy obține singur un certificat Let's Encrypt.
+- `encode gzip`: comprimă răspunsurile.
+- `handle_path /api/*`: cererile spre `/api/...` merg la server, **fără** prefixul `/api` (deci `/api/health` ajunge ca `/health`).
+- `handle`: tot restul merge la site.

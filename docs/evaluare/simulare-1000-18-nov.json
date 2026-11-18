@@ -1,0 +1,40 @@
+{
+  "voters": 1000,
+  "candidates": 3,
+  "trustees": 3,
+  "concurrency": 8,
+  "nfcShare": 0,
+  "encryptAndProveMs": {
+    "avg": 24.09,
+    "p50": 23.48,
+    "p95": 28.49,
+    "max": 105.14
+  },
+  "castRoundtripMs": {
+    "avg": 269.96,
+    "p50": 289.29,
+    "p95": 322.45,
+    "max": 414.55
+  },
+  "registerRoundtripMs": {
+    "avg": 114.43,
+    "p50": 115.94,
+    "p95": 181.49,
+    "max": 278.8
+  },
+  "ballotsPerSecond": 14.34,
+  "closeAggregateMs": 980.2,
+  "partialDecryptMs": {
+    "avg": 16.53,
+    "p50": 15.85,
+    "p95": 18.3,
+    "max": 18.3
+  },
+  "verifyTotalMs": 32854,
+  "verifyPerBallotMs": 32.85,
+  "auditBundleBytes": 2174888,
+  "resultCorrect": true,
+  "verifierOk": true,
+  "totalSeconds": 104.4,
+  "electionId": "simulare-1000-alegatori-2026-11-18-01-30-c7106b"
+}

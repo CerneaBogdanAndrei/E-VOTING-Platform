@@ -26,7 +26,7 @@ Tot codul proiectului e TypeScript, cu excepția celor două module Android (Kot
 
 1. **Un singur limbaj peste tot.** Criptografia e scrisă o dată, în `packages/crypto`, și o folosesc la fel telefonul, site-ul, serverul și verificatorul. O dovadă făcută pe telefon e verificată de **exact același cod** pe server. Dacă serverul ar fi fost în Java și telefonul în Kotlin, criptografia ar fi trebuit scrisă de două ori, cu riscul ca cele două variante să difere.
 2. **Erorile se prind devreme.** Într-un sistem de vot, un câmp greșit (de exemplu `ciphertext` în loc de `ciphertexts`) poate face un vot invalid. TypeScript prinde asta înainte de rulare. Setarea `"strict": true` din `tsconfig.base.json` activează toate verificările.
-3. **Contractul dintre aplicații și server e un singur fișier.** `packages/api/src/types.ts` descrie ce trimite și ce primește fiecare rută. Dacă se schimbă ceva acolo, TypeScript arată imediat toate locurile din telefon, site și server care trebuie actualizate.
+3. **Contractul dintre aplicații și server e un singur fișier.** `packages/api/src/contract/` descrie ce trimite și ce primește fiecare rută (un fișier per temă: scrutin, alegător, board, erori, interfața clientului). Dacă se schimbă ceva acolo, TypeScript arată imediat toate locurile din telefon, site și server care trebuie actualizate.
 
 Alternative respinse: Java/Kotlin pe server (două limbaje), Python (nu rulează pe telefon și în browser), JavaScript simplu (fără verificarea tipurilor).
 
@@ -100,7 +100,7 @@ Conceptele NestJS din proiect:
 | Concept | Ce este | Exemplu în proiect |
 | --- | --- | --- |
 | **Controller** | Clasa care primește cererile HTTP și le trimite mai departe. Fiecare metodă e legată de o rută. | `ElectionsController`: `@Get(':id/board')` → `board(id)` |
-| **Service** (provider) | Clasa care face treaba propriu-zisă: logica și accesul la baza de date. | `VotingService.cast(...)` |
+| **Service** (provider) | Clasa care face treaba propriu-zisă: logica și accesul la baza de date. | `BallotsService.cast(...)` |
 | **Module** | Lista care spune Nest-ului ce controllere și servicii există. | `AppModule` |
 | **Guard** | O verificare înainte ca cererea să ajungă la controller. Dacă pică, cererea e refuzată. | `AdminGuard` verifică token-ul comisiei |
 | **Decorator** | Adnotarea care începe cu `@`, pusă deasupra unei clase sau metode, care îi spune Nest-ului ce să facă cu ea. | `@Controller('elections')`, `@Post()`, `@UseGuards(AdminGuard)` |
@@ -124,6 +124,7 @@ Alternativa mai simplă ar fi fost Express direct, dar ar fi trebuit construite 
 | `reflect-metadata` | Permite decoratorilor să rețină informații despre clase (de exemplu, ce tip are fiecare parametru din constructor). Nest are nevoie de ea; se importă o dată, în `app.ts`. |
 | `rxjs` | Bibliotecă pentru fluxuri de evenimente, folosită intern de Nest. Proiectul nu o folosește direct. |
 | `multer` | Bibliotecă pentru încărcarea fișierelor, adusă de `platform-express`. Versiunea e forțată la 2.5.0 în `package.json` de la rădăcină (`"overrides"`), pentru că versiunile vechi aveau o vulnerabilitate cunoscută. |
+| `helmet` | Adaugă la fiecare răspuns **antetele de securitate**: `Strict-Transport-Security` (browserul folosește doar HTTPS), `X-Content-Type-Options: nosniff`, `X-Frame-Options` (site-ul nu poate fi pus într-un cadru ascuns), `Referrer-Policy`; scoate `X-Powered-By`. Se activează cu un rând în `app.ts`. |
 
 ## 2.5 Baza de date: PostgreSQL, `pg` și Supabase
 
@@ -210,9 +211,11 @@ Variabilele care încep cu `VITE_` (de exemplu `VITE_API_URL`) sunt puse în cod
 
 **De ce Vite:** foarte rapid, configurare minimă (7 rânduri în `vite.config.ts`).
 
-### oxlint
+### oxlint și prettier
 
-Un **linter**: un program care citește codul și semnalează greșeli probabile sau stil inconsistent, fără să-l ruleze. E foarte rapid, fiind scris în Rust.
+**oxlint** e un **linter**: un program care citește codul și semnalează greșeli probabile (variabile nefolosite, reguli ale hook-urilor React încălcate), fără să-l ruleze. E foarte rapid, fiind scris în Rust. Rulează pe tot proiectul cu `npm run lint` (regulile în `.oxlintrc.json`, la rădăcină).
+
+**prettier** e un **formatter**: rescrie codul ca să arate la fel peste tot (ghilimele simple, fără `;`, rânduri de cel mult 160 de caractere). `npm run format` formatează tot, iar `npm run format:check` doar verifică (așa rulează în CI). Markdown-ul nu e formatat, ca tabelele scrise de mână să rămână cum sunt.
 
 ### `sessionStorage`
 
@@ -269,7 +272,7 @@ Unele lucruri nu se pot face din JavaScript, de exemplu vorbitul direct cu cipul
 
 **APK** (Android Package) e fișierul de instalare al aplicației Android. Al tău e în `apk/vot-verificabil.apk` și e construit pe serverele GitHub (vezi 2.10).
 
-## 2.9 Docker, Docker Compose și nginx
+## 2.9 Docker, Docker Compose, nginx și Caddy
 
 ### Problema pe care o rezolvă Docker
 
@@ -294,12 +297,17 @@ Docker împachetează un program **împreună cu tot ce-i trebuie** (sistem de o
 | `db` | PostgreSQL 16 local (folosit doar dacă `DATABASE_URL` lipsește din `.env`) | intern |
 | `backend` | Serverul NestJS | 3000 |
 | `web` | Site-ul, servit de nginx | 8080 |
+| `proxy` | Caddy: HTTPS pentru site (`/`) și API (`/api`) | 443 (și 80, redirecționat spre 443) |
 
-`depends_on` cu `condition: service_healthy` înseamnă: backend-ul pornește doar după ce baza răspunde. `healthcheck` e comanda prin care Docker verifică periodic dacă un serviciu e sănătos.
+`depends_on` cu `condition: service_healthy` înseamnă: backend-ul pornește doar după ce baza răspunde. `healthcheck` e comanda prin care Docker verifică periodic dacă un serviciu e sănătos (la backend, `wget http://127.0.0.1:3000/health`; cu `localhost`, care în container înseamnă adresa IPv6 `::1`, verificarea pica, pentru că serverul ascultă pe IPv4).
 
 ### nginx
 
 Un server web foarte rapid pentru fișiere statice. După `npm run build`, site-ul e doar un set de fișiere HTML, JS și CSS. nginx le servește pe portul 80 din container (8080 la tine). Regula `try_files $uri /index.html` trimite orice adresă necunoscută spre `index.html`, ca React Router să poată afișa pagina potrivită.
+
+### Caddy
+
+Un server web care face **HTTPS automat**. Stă în fața celorlalte containere (de aceea se numește *reverse proxy*): primește cererile pe portul 443, le criptează cu TLS și le trimite mai departe, site-ului sau serverului. Configurarea e în `infra/Caddyfile` (17 rânduri). Pentru `localhost` emite un certificat local, la care browserul cere o confirmare; pentru un domeniu real obține singur, gratuit, un certificat Let's Encrypt și îl reînnoiește. Cu Caddy, token-ul comisiei și sesiunile alegătorilor nu mai circulă niciodată în clar.
 
 **De ce Docker:** planul cerea o demonstrație pornită cu o singură comandă, repetabilă pe orice calculator. Pentru găzduirea online, aceleași imagini se pot urca pe orice serviciu (Render, Railway, un VPS).
 
@@ -315,7 +323,7 @@ Fișierele sunt în `.github/workflows/` și sunt scrise în **YAML** (un format
 
 | Workflow | Când rulează | Ce face |
 | --- | --- | --- |
-| `ci.yml` | La fiecare push | Pornește un PostgreSQL de test, instalează tot, rulează cele 63 de teste și build-ul. Separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
+| `ci.yml` | La fiecare push | Pornește un PostgreSQL de test, instalează tot, rulează linterul, verificarea formatării, cele 93 de teste, build-ul și `npm audit`. Separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
 | `android-apk.yml` | Când se schimbă `apps/mobile` sau `packages`, sau manual | Instalează Java 17 (Android SDK există deja pe serverele GitHub), rulează `expo prebuild` și `gradlew assembleRelease`, apoi salvează APK-ul în `apk/` și îl face commit. |
 
 **De ce pe GitHub:** construirea unui APK cere Android SDK (câțiva GB). Pe serverele GitHub e gratuit și nu-ți ocupă PC-ul.
