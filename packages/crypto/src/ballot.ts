@@ -136,20 +136,38 @@ export function verifyBallot(params: ElectionParams, ballot: Ballot): BallotChec
   return verifyBallotProofs(params, ballot)
 }
 
-export type AuditCheck = { ok: true; choice: number } | { ok: false; reason: string }
+/**
+ * Rezultatul auditului. `malformed` înseamnă că datele nu au forma exportată de aplicație
+ * (fișier greșit, text tăiat): nu e o dovadă că aplicația a trișat, doar că nu se poate verifica.
+ */
+export type AuditCheck = { ok: true; choice: number } | { ok: false; reason: string; malformed?: boolean }
+
+const malformed = (reason: string): AuditCheck => ({ ok: false, reason: `Datele de audit sunt incomplete: ${reason}`, malformed: true })
 
 /**
  * Provocarea Benaloh: cu r-urile dezvăluite, oricine recriptează opțiunea
  * declarată și compară cu buletinul. Un buletin auditat nu se mai trimite.
  */
 export function auditBallot(params: ElectionParams, ciphertexts: readonly Ciphertext[], secrets: BallotSecrets): AuditCheck {
+  const n = params.candidateCount
+  if (!Array.isArray(ciphertexts)) return malformed('lipsesc criptotextele')
+  if (!secrets || typeof secrets !== 'object' || !Array.isArray(secrets.randomness)) return malformed('lipsesc numerele aleatoare r')
+  if (!Number.isInteger(secrets.choice) || secrets.choice < 0 || secrets.choice >= n) return malformed('opțiunea declarată nu e o poziție din listă')
+  if (ciphertexts.length !== n || secrets.randomness.length !== n) return malformed(`se așteaptă câte ${n} criptotexte și ${n} valori r (câte una per opțiune)`)
+  const rs: bigint[] = []
+  for (let j = 0; j < n; j++) {
+    const ct = ciphertexts[j]
+    if (!ct || typeof ct !== 'object' || typeof ct.a !== 'string' || typeof ct.b !== 'string') return malformed(`criptotextul ${j + 1} nu are forma (A, B)`)
+    try {
+      rs.push(scalarFromHex(secrets.randomness[j], `r${j + 1}`))
+    } catch (err) {
+      return malformed(err instanceof Error ? err.message : String(err))
+    }
+  }
   try {
-    const n = params.candidateCount
-    if (ciphertexts.length !== n || secrets.randomness.length !== n) return { ok: false, reason: 'Număr greșit de criptotexte' }
     const y = preparePublicKey(params.publicKey)
     for (let j = 0; j < n; j++) {
-      const r = scalarFromHex(secrets.randomness[j], `r${j + 1}`)
-      const expected = encodeCiphertext(encryptPoints(y, j === secrets.choice ? 1 : 0, r))
+      const expected = encodeCiphertext(encryptPoints(y, j === secrets.choice ? 1 : 0, rs[j]))
       if (expected.a !== ciphertexts[j].a || expected.b !== ciphertexts[j].b) {
         return { ok: false, reason: `Criptotextul ${j + 1} nu corespunde opțiunii declarate` }
       }

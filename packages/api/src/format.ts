@@ -45,7 +45,18 @@ export const percent = (part: number, whole: number) => (whole === 0 ? '0%' : `$
 
 export const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
-/** „2 zile și 3 ore”, „45 de minute”, „sub un minut”. */
+/**
+ * Numărul cu substantivul acordat, ca în română: „1 cheie”, „2 chei”, „20 de chei”, „101 chei”.
+ * „de” apare când ultimele două cifre fac 0 sau cel puțin 20 (în afară de numărul 0).
+ */
+export function plural(n: number, one: string, many: string): string {
+  if (n === 1) return `1 ${one}`
+  const lastTwo = Math.abs(n) % 100
+  const de = n !== 0 && (lastTwo === 0 || lastTwo >= 20)
+  return `${n} ${de ? 'de ' : ''}${many}`
+}
+
+/** „2 zile și 3 ore”, „45 de minute”, „21 de ore”, „sub un minut”. */
 export function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60_000)
   if (minutes < 1) return 'sub un minut'
@@ -53,9 +64,9 @@ export function formatDuration(ms: number): string {
   const hours = Math.floor((minutes % 1440) / 60)
   const mins = minutes % 60
   const parts: string[] = []
-  if (days) parts.push(days === 1 ? 'o zi' : `${days} zile`)
-  if (hours) parts.push(hours === 1 ? 'o oră' : `${hours} ore`)
-  if (!days && mins) parts.push(mins === 1 ? 'un minut' : `${mins}${mins >= 20 ? ' de' : ''} minute`)
+  if (days) parts.push(days === 1 ? 'o zi' : plural(days, 'zi', 'zile'))
+  if (hours) parts.push(hours === 1 ? 'o oră' : plural(hours, 'oră', 'ore'))
+  if (!days && mins) parts.push(mins === 1 ? 'un minut' : plural(mins, 'minut', 'minute'))
   return parts.slice(0, 2).join(' și ')
 }
 

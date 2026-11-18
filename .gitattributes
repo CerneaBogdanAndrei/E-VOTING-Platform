@@ -1,3 +1,10 @@
+# Toate fișierele text rămân cu LF, și pe Windows (unde core.autocrlf=true le-ar face CRLF):
+# altfel `npm run format:check` (prettier, endOfLine: lf) pică local pe fiecare fișier.
+* text=auto eol=lf
 # Scripturile shell rulează în containere Linux: mereu LF, și pe Windows.
 *.sh text eol=lf
 Dockerfile text eol=lf
+# binare
+*.png binary
+*.apk binary
+*.jar binary

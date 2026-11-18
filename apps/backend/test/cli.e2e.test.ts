@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, it } from 'node:test'
@@ -107,6 +107,19 @@ describe('backend: CLI-urile trustee și verificator contra serverului real', { 
     const report = JSON.parse(offline.stdout)
     assert.equal(report.ok, true)
     assert.equal(report.ballots, 2)
+    assert.equal(report.threads, 1)
+    // aceeași verificare pe două fire (worker_threads): același raport
+    const parallel = await cli(VERIFIER, ['--bundle', 'arhiva.json', '--json', '--workers', '2'], dir)
+    assert.equal(parallel.code, 0, parallel.stdout)
+    const parallelReport = JSON.parse(parallel.stdout)
+    assert.equal(parallelReport.threads, 2)
+    assert.deepEqual(parallelReport.steps, report.steps)
+    assert.notEqual((await cli(VERIFIER, ['--bundle', 'arhiva.json', '--workers', 'zero'], dir)).code, 0)
+    // un fișier de audit Benaloh incomplet: codul 2 („nu se poate verifica”), nu 1 („aplicația a trișat”)
+    await writeFile(join(dir, 'audit-incomplet.json'), JSON.stringify({ electionId: election.id, secrets: { choice: 0 } }))
+    const audit = await cli(VERIFIER, ['audit-ballot', ...api, '--file', 'audit-incomplet.json'], dir)
+    assert.equal(audit.code, 2, audit.stdout)
+    assert.match(audit.stdout, /Datele de audit sunt incomplete/)
     // hash publicat independent greșit → codul 1
     const bad = await cli(VERIFIER, [...api, '--head', `1:${'0'.repeat(64)}`], dir)
     assert.equal(bad.code, 1)

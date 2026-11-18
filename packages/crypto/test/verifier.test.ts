@@ -170,8 +170,17 @@ describe('verificatorul public', () => {
 
   it('progresul e raportat și verificatorul cedează controlul periodic', async () => {
     const seen: string[] = []
-    const report = await verifyElection(sim.bundle, { yieldEvery: 3, onProgress: (step) => seen.push(step) })
+    const perBallot: string[] = []
+    const report = await verifyElection(sim.bundle, {
+      yieldEvery: 3,
+      onProgress: (step, done) => {
+        seen.push(step)
+        if (done > 0) perBallot.push(step)
+      },
+    })
     assert.equal(report.ok, true)
-    assert.deepEqual([...new Set(seen)], ['chain', 'credentials', 'proofs'])
+    // fiecare pas își anunță începutul (0 din total), în ordine; pașii care parcurg board-ul raportează și cât au terminat
+    assert.deepEqual([...new Set(seen)], ['keys', 'chain', 'credentials', 'proofs', 'aggregate', 'decryption'])
+    assert.deepEqual([...new Set(perBallot)], ['chain', 'credentials', 'proofs', 'aggregate'])
   })
 })

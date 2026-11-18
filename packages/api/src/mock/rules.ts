@@ -24,6 +24,7 @@ import {
   type TrustLevel,
   type UpdateElectionInput,
 } from '../contract/index.js'
+import { plural } from '../format.js'
 import { isValidCnp } from '../identity/cnp.js'
 import { electionParams, prepareBallot } from '../voter.js'
 import { pickWeighted } from './random.js'
@@ -65,7 +66,7 @@ export function deleteElection(ctx: MockContext, s: ElectionState) {
 export function openElection(ctx: MockContext, s: ElectionState, now = Date.now()) {
   if (s.data.status !== 'draft') throw new ApiError(409, 'Scrutinul nu este în configurare')
   const missing = s.data.trustees.filter((t) => !t.publicKeyShare).length
-  if (missing > 0) throw new ApiError(409, `Lipsesc cheile de la ${missing} trustee(s)`)
+  if (missing > 0) throw new ApiError(409, missing === 1 ? 'Lipsește cheia unui trustee' : `Lipsesc cheile de la ${plural(missing, 'trustee', 'trustees')}`)
   if (s.eligible.size === 0) throw new ApiError(409, 'Lista alegătorilor eligibili este goală')
   if (new Date(s.data.closesAt).getTime() <= now) throw new ApiError(409, 'Data închiderii a trecut deja; modifică intervalul scrutinului')
   s.data.status = 'open'

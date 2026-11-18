@@ -7,7 +7,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api, mockTools, type TrusteeToken } from '../../api'
 import { canEdit, useAdmin } from '../../api/admin'
 import { Countdown, ErrorBox, Hash, Loading, Message, Stat, StatusBadge, type MessageKind } from '../../components/ui'
-import { candidateLabel, formatInterval, percent } from '../../lib/format'
+import { candidateLabel, formatInterval, percent, plural } from '../../lib/format'
 import { useAsync } from '../../lib/useAsync'
 import { AuditLog } from './parts/AuditLog'
 import { BoardHead } from './parts/BoardHead'
@@ -29,6 +29,8 @@ export function CommissionElection() {
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ kind: MessageKind; text: string }>()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // închiderea e ireversibilă (agregatul se publică, nu se mai poate vota), deci cere confirmare, ca ștergerea
+  const [confirmClose, setConfirmClose] = useState(false)
 
   /** Rulează o acțiune, afișează rezultatul și reîncarcă scrutinul. */
   const act = async (name: string, fn: () => Promise<unknown>, ok?: (value: unknown) => string) => {
@@ -118,21 +120,32 @@ export function CommissionElection() {
               </button>
             </>
           )}
-          {editable && e.status === 'open' && (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!!busy}
-              onClick={() =>
-                act(
-                  'close',
-                  () => api.closeElection(e.id),
-                  () => 'Votul este închis. Urmează decriptarea de către trustees.',
-                )
-              }
-            >
+          {editable && e.status === 'open' && !confirmClose && (
+            <button type="button" className="btn btn-danger" disabled={!!busy} onClick={() => setConfirmClose(true)}>
               Închide votul
             </button>
+          )}
+          {editable && e.status === 'open' && confirmClose && (
+            <>
+              <span className="muted small">Închiderea e definitivă: nimeni nu mai poate vota.</span>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={!!busy}
+                onClick={() =>
+                  act(
+                    'close',
+                    () => api.closeElection(e.id),
+                    () => 'Votul este închis. Urmează decriptarea de către trustees.',
+                  ).finally(() => setConfirmClose(false))
+                }
+              >
+                Da, închide votul acum
+              </button>
+              <button type="button" className="btn" onClick={() => setConfirmClose(false)}>
+                Nu
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -156,7 +169,7 @@ export function CommissionElection() {
           <h3>Trustees</h3>
           <p className="hint">
             {keysMissing > 0
-              ? `Lipsesc ${keysMissing} chei. Fiecare trustee rulează CLI-ul și trimite doar Yᵢ; cheia secretă rămâne la el.`
+              ? `${keysMissing === 1 ? 'Lipsește o cheie' : `Lipsesc ${plural(keysMissing, 'cheie', 'chei')}`}. Fiecare trustee rulează CLI-ul și trimite doar Yᵢ; cheia secretă rămâne la el.`
               : 'Toate cheile au fost primite, iar cheia scrutinului e publicată.'}
           </p>
           <ul className="list-plain">

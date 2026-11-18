@@ -19,11 +19,16 @@ export function credentialPublicKey(secretKeyHex: string): string {
   return bytesToHex(ed25519.getPublicKey(hexToBytes(secretKeyHex)))
 }
 
+/**
+ * Cheie publică Ed25519 validă: un punct de pe curbă, dar nu unul de ordin mic. Pentru cele
+ * opt puncte de ordin mic (de exemplu identitatea), oricine poate „semna” fără cheia secretă.
+ */
 export function isCredentialPubkey(value: unknown): value is string {
   if (!isHex(value, 32)) return false
   try {
-    ed25519.Point.fromHex(value).assertValidity()
-    return true
+    const point = ed25519.Point.fromHex(value)
+    point.assertValidity()
+    return !point.isSmallOrder()
   } catch {
     return false
   }

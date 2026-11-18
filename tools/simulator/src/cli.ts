@@ -5,7 +5,7 @@
 // simulării și afișează metricile de performanță din planul de evaluare.
 //
 //   evoting-simulate --api URL --admin-token TOKEN --voters 1000 [--candidates 3] [--trustees 3]
-//                    [--concurrency 8] [--nfc 0.3 --pki DIR] [--report FIȘIER]
+//                    [--concurrency 8] [--nfc 0.3 --pki DIR] [--workers N] [--report FIȘIER]
 //
 // Backend-ul trebuie pornit cu RATE_LIMIT=off: toți alegătorii vin de pe aceeași adresă IP.
 // Ajutoarele sunt în lib/: metrici, paralelism, alegători sintetici, afișare.
@@ -14,6 +14,7 @@ import { writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 import { authenticate, createHttpClient, prepareBallot, type Election } from '@evoting/api'
 import { generateCredential, generateTrusteeKey, partialDecrypt, verifyElection, type TrusteeKeyPair } from '@evoting/crypto'
+import { createNodeWork, defaultThreads } from '@evoting/crypto/node'
 import { stats, timed } from './lib/metrics.js'
 import { badLine, good, ok, step } from './lib/output.js'
 import { pool } from './lib/pool.js'
@@ -30,6 +31,8 @@ const { values } = parseArgs({
     nfc: { type: 'string', default: '0' },
     pki: { type: 'string' },
     report: { type: 'string' },
+    // verificarea publică se măsoară pe un fir și apoi în paralel, pe atâtea fire
+    workers: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
   },
 })
@@ -43,6 +46,7 @@ const N = Number(values.voters)
 const C = Number(values.candidates)
 const T = Number(values.trustees)
 const CONC = Number(values.concurrency)
+const WORKERS = values.workers ? Number(values.workers) : defaultThreads()
 const NFC_SHARE = Number(values.nfc)
 const adminToken = values['admin-token'] ?? (console.error('Lipsește --admin-token (sau ADMIN_TOKEN)'), process.exit(2))
 const api = createHttpClient(values.api!, { getAdminToken: () => adminToken })
@@ -159,6 +163,21 @@ async function main() {
   ok(`descărcare ${downloadMs.toFixed(0)} ms, verificare ${(verifyMs / 1000).toFixed(2)} s (${(verifyMs / N).toFixed(1)} ms/buletin)`)
   metrics.verifyTotalMs = +verifyMs.toFixed(0)
   metrics.verifyPerBallotMs = +(verifyMs / N).toFixed(2)
+  if (WORKERS > 1) {
+    // aceeași verificare, cu semnăturile și dovezile împărțite pe toate nucleele
+    const work = createNodeWork(WORKERS)
+    const [parallel, parallelMs] = await timed(() => verifyElection({ ...bundle }, { publishedHead: bundle.head, work }))
+    await work.close()
+    const same = JSON.stringify(parallel) === JSON.stringify(report)
+    const speedup = verifyMs / parallelMs
+    ;(same ? ok : badLine)(
+      `în paralel, pe ${WORKERS} fire: ${(parallelMs / 1000).toFixed(2)} s, de ${speedup.toFixed(1)} ori mai rapid; raport ${same ? 'identic' : 'DIFERIT'}`,
+    )
+    metrics.verifyThreads = WORKERS
+    metrics.verifyParallelMs = +parallelMs.toFixed(0)
+    metrics.verifySpeedup = +speedup.toFixed(2)
+    metrics.verifyParallelSameReport = same
+  }
   metrics.auditBundleBytes = JSON.stringify(bundle).length
   metrics.resultCorrect = correct
   metrics.verifierOk = report.ok
@@ -172,15 +191,19 @@ async function main() {
     'înregistrare (dus-întors)': metrics.registerRoundtripMs,
     'decriptare parțială / trustee': metrics.partialDecryptMs,
   })
-  console.log(`  buletine/s: ${metrics.ballotsPerSecond} · închidere: ${metrics.closeAggregateMs} ms · verificare: ${metrics.verifyTotalMs} ms`)
+  console.log(
+    `  buletine/s: ${metrics.ballotsPerSecond} · închidere: ${metrics.closeAggregateMs} ms · verificare: ${metrics.verifyTotalMs} ms` +
+      (metrics.verifyParallelMs !== undefined ? ` (în paralel pe ${metrics.verifyThreads} fire: ${metrics.verifyParallelMs} ms)` : ''),
+  )
   if (values.report) {
     await writeFile(values.report, JSON.stringify(metrics, null, 2))
     ok(`raport salvat în ${values.report}`)
   }
-  process.exit(correct && report.ok ? 0 : 1)
+  // exitCode, nu process.exit(): pe Windows, oprirea forțată imediat după un fetch prăbușește Node
+  process.exitCode = correct && report.ok && metrics.verifyParallelSameReport !== false ? 0 : 1
 }
 
 main().catch((err) => {
   console.error(`\x1b[31mEroare:\x1b[0m ${err instanceof Error ? err.message : String(err)}`)
-  process.exit(1)
+  process.exitCode = 1
 })

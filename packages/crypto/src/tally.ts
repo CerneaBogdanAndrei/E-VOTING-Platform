@@ -6,14 +6,26 @@ import { addCiphertexts, decodeCiphertext, encodeCiphertext } from './elgamal.js
 import { G, pointFromHex, pointToHex, ZERO, type Point } from './group.js'
 import type { Ciphertext, PartialDecryption } from './types.js'
 
-/** (Aⱼ, Bⱼ) = (Σₖ Aₖⱼ, Σₖ Bₖⱼ) pentru fiecare candidat j. */
-export function computeAggregate(candidateCount: number, ballots: readonly { ciphertexts: readonly Ciphertext[] }[]): Ciphertext[] {
+/**
+ * (Aⱼ, Bⱼ) = (Σₖ Aₖⱼ, Σₖ Bₖⱼ) pentru fiecare candidat j. `offset` e poziția primului buletin
+ * pe board, când se adună doar o bucată (verificarea în paralel), ca mesajele de eroare să-l numească exact.
+ */
+export function computeAggregate(candidateCount: number, ballots: readonly { ciphertexts: readonly Ciphertext[] }[], offset = 0): Ciphertext[] {
   const columns = Array.from({ length: candidateCount }, () => [] as ReturnType<typeof decodeCiphertext>[])
-  ballots.forEach((b, k) => {
+  ballots.forEach((b, i) => {
+    const k = offset + i
+    if (!Array.isArray(b?.ciphertexts)) throw new Error(`Buletinul ${k + 1} nu are criptotexte`)
     if (b.ciphertexts.length !== candidateCount) throw new Error(`Buletinul ${k + 1} are ${b.ciphertexts.length} criptotexte`)
     b.ciphertexts.forEach((ct, j) => columns[j].push(decodeCiphertext(ct, `buletinul ${k + 1}, criptotextul ${j + 1}`)))
   })
   return columns.map((col) => encodeCiphertext(addCiphertexts(col)))
+}
+
+/** Suma unor agregate parțiale (ale unor bucăți din board): același rezultat ca agregatul întregului board. */
+export function sumAggregates(candidateCount: number, parts: readonly (readonly Ciphertext[])[]): Ciphertext[] {
+  return Array.from({ length: candidateCount }, (_, j) =>
+    encodeCiphertext(addCiphertexts(parts.map((p, i) => decodeCiphertext(p[j], `agregatul parțial ${i + 1}, candidatul ${j + 1}`)))),
+  )
 }
 
 /** Logaritm discret pentru valori mici: găsește t ∈ [0, max] cu tG = target, în O(√max). */

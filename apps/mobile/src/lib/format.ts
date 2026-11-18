@@ -9,6 +9,7 @@ export {
   groupHash,
   intervalPhase,
   percent,
+  plural,
   shortHash,
   statusLabel,
   trustLabel,

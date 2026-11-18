@@ -1,7 +1,8 @@
 // decrypt: după închiderea votului, verifică board-ul și agregatul, apoi trimite decriptarea parțială.
 
-import { createHttpClient } from '@evoting/api'
+import { createHttpClient, plural } from '@evoting/api'
 import { partialDecrypt, verifyElection } from '@evoting/crypto'
+import { createNodeWork } from '@evoting/crypto/node'
 import { isEncrypted, readStoredKeyFile, unlockKeyFile } from '../key-file.js'
 import { bad, die, ok } from '../output.js'
 import { passwordForExistingKey, type PasswordSource } from '../password.js'
@@ -30,7 +31,9 @@ export async function decrypt(options: DecryptOptions) {
   // Trustee-ul nu decriptează orbește: verifică întâi board-ul și că agregatul e suma lui.
   // Altfel un server rău-intenționat i-ar putea cere să decripteze un buletin individual.
   console.log('Verific board-ul înainte de decriptare…')
-  const report = await verifyElection({ ...bundle, result: null })
+  // semnăturile și dovezile se verifică pe toate nucleele (pentru câteva buletine, un singur fir ajunge)
+  const work = bundle.board.length >= 32 ? createNodeWork() : undefined
+  const report = await verifyElection({ ...bundle, result: null }, { work }).finally(() => work?.close())
   for (const s of report.steps) {
     if (s.id === 'decryption') continue
     if (s.status === 'fail') {
@@ -48,6 +51,7 @@ export async function decrypt(options: DecryptOptions) {
     ok('toți trustees au decriptat; rezultatul e publicat:')
     for (const c of updated.candidates) console.log(`      ${c.name}: ${result.counts.find((x) => x.candidateId === c.id)?.votes ?? 0}`)
   } else {
-    console.log(`  Mai lipsesc ${updated.trustees.filter((t) => !t.partialDecryptionSubmitted).length} decriptări.`)
+    const left = updated.trustees.filter((t) => !t.partialDecryptionSubmitted).length
+    console.log(left === 1 ? '  Mai lipsește o decriptare.' : `  Mai lipsesc ${plural(left, 'decriptare', 'decriptări')}.`)
   }
 }

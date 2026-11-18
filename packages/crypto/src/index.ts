@@ -29,7 +29,21 @@ export {
   type PartialCheck,
 } from './trustee.js'
 export { GENESIS_HASH, genesisHash, computeEntryHash, appendEntry, entryToBallot, checkOwnEntry, normalizeTrackingCode, type EntryCheck } from './board.js'
-export { computeAggregate, babyStepGiantStep, combinePartialDecryptions } from './tally.js'
+export { computeAggregate, sumAggregates, babyStepGiantStep, combinePartialDecryptions } from './tally.js'
+export {
+  sequentialWork,
+  createParallelWork,
+  handleWorkRequest,
+  checkSignatures,
+  checkProofs,
+  type BallotWork,
+  type ParallelWork,
+  type ParallelOptions,
+  type WorkerPort,
+  type WorkRequest,
+  type WorkResponse,
+  type WorkProgress,
+} from './parallel.js'
 export {
   verifyElection,
   STEP_TITLES,

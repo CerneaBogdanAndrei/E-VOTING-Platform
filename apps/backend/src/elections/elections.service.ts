@@ -1,9 +1,10 @@
 // Acțiunile comisiei asupra unui scrutin: creare, modificare și ștergere (în configurare),
 // importul eligibililor, deschiderea și închiderea votului (cu publicarea agregatului).
 
-import { ConflictException, Inject, Injectable } from '@nestjs/common'
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common'
 import {
   isValidCnp,
+  plural,
   type AdminIdentity,
   type BoardEntry,
   type CreateElectionInput,
@@ -39,6 +40,8 @@ function parseCandidates(value: unknown) {
 
 @Injectable()
 export class ElectionsService {
+  private readonly logger = new Logger('Elections')
+
   constructor(
     private readonly db: Database,
     private readonly elections: ElectionsRepository,
@@ -187,7 +190,8 @@ export class ElectionsService {
       const e = await this.elections.lock(client, id)
       if (e.status !== 'draft') throw new ConflictException('Scrutinul nu este în configurare')
       const missing = await client.query('SELECT 1 FROM trustees WHERE election_id = $1 AND public_key_share IS NULL', [id])
-      if (missing.rowCount) throw new ConflictException(`Lipsesc cheile de la ${missing.rowCount} trustee(s)`)
+      const n = missing.rowCount ?? 0
+      if (n) throw new ConflictException(n === 1 ? 'Lipsește cheia unui trustee' : `Lipsesc cheile de la ${plural(n, 'trustee', 'trustees')}`)
       const eligible = await client.query('SELECT 1 FROM eligible_voters WHERE election_id = $1 LIMIT 1', [id])
       if (!eligible.rowCount) throw new ConflictException('Lista alegătorilor eligibili este goală')
       if (e.closes_at.getTime() <= Date.now()) throw new ConflictException('Data închiderii a trecut deja; modifică intervalul scrutinului')
@@ -222,8 +226,9 @@ export class ElectionsService {
       try {
         await this.close(r.id, 'server', { automatic: true })
         closed.push(r.id)
-      } catch {
-        // altă instanță l-a închis între timp
+      } catch (err) {
+        // 409: altă instanță l-a închis între timp. Orice altă eroare apare în log, iar celelalte scrutine se închid în continuare.
+        if (!(err instanceof ConflictException)) this.logger.warn(`scrutinul ${r.id} nu s-a putut închide automat: ${(err as Error).message}`)
       }
     }
     return closed

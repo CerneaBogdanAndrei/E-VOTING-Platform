@@ -61,7 +61,7 @@ export function EligibleImport({ election, onImported }: { election: Election; o
           <span>
             Importați: {result.imported} · duplicate: {result.duplicates} · invalide: {result.invalid.length}
             {result.invalid.length > 0 &&
-              ` (liniile ${result.invalid
+              ` (${result.invalid.length === 1 ? 'linia' : 'liniile'} ${result.invalid
                 .slice(0, 8)
                 .map((x) => x.line)
                 .join(', ')}${result.invalid.length > 8 ? '…' : ''})`}

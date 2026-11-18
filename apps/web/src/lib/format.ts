@@ -11,6 +11,7 @@ export {
   intervalPhase,
   methodLabel,
   percent,
+  plural,
   roleLabel,
   shortHash,
   statusLabel,

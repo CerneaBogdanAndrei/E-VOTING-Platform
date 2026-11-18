@@ -13,7 +13,8 @@ export function pgOptions(databaseUrl: string, env: NodeJS.ProcessEnv = process.
   url.searchParams.delete('sslmode')
   const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname)
   const flag = env.DATABASE_SSL?.toLowerCase()
-  const useSsl = flag === 'off' || flag === 'false' ? false : flag === 'on' || flag === 'true' || (sslmode && sslmode !== 'disable') ? true : !local
+  // ordinea: DATABASE_SSL explicit, apoi sslmode din URL (disable îl oprește, orice altceva îl pornește), apoi „nu e local”
+  const useSsl = flag === 'off' || flag === 'false' ? false : flag === 'on' || flag === 'true' ? true : sslmode === 'disable' ? false : sslmode ? true : !local
   const ca = env.DATABASE_CA?.replace(/\\n/g, '\n')
   return {
     connectionString: url.toString(),

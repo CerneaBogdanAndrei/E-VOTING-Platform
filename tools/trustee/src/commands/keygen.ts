@@ -1,7 +1,7 @@
 // keygen: generează local xᵢ, salvează fișierul de cheie (opțional criptat cu parolă),
 // apoi trimite doar Yᵢ cu dovada Schnorr.
 
-import type { ApiClient } from '@evoting/api'
+import { plural, type ApiClient } from '@evoting/api'
 import { generateTrusteeKey } from '@evoting/crypto'
 import { keyFileExists, writeKeyFile } from '../key-file.js'
 import { die, ok } from '../output.js'
@@ -40,5 +40,8 @@ export async function keygen(client: ApiClient, options: KeygenOptions) {
   const updated = await client.submitTrusteeKey(electionId, token, publicKey)
   ok(`Yᵢ = ${publicKey.publicKeyShare.slice(0, 16)}… trimisă, cu dovada Schnorr`)
   if (updated.publicKey) ok(`toți trustees au trimis cheile; cheia scrutinului Y = ${updated.publicKey.slice(0, 16)}…`)
-  else console.log(`  Mai lipsesc ${updated.trustees.filter((t) => !t.publicKeyShare).length} chei.`)
+  else {
+    const left = updated.trustees.filter((t) => !t.publicKeyShare).length
+    console.log(left === 1 ? '  Mai lipsește o cheie.' : `  Mai lipsesc ${plural(left, 'cheie', 'chei')}.`)
+  }
 }
