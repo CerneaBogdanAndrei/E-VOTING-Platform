@@ -19,7 +19,7 @@ Variabilele de mediu sunt explicate în `.env.example` și în [docs/GHID-COMPLE
 
 | Folder | Ce conține |
 | --- | --- |
-| `migrations/` | `001_init.sql` (primele nouă tabele, trigger-ul append-only pe `ballots`), `002_rls.sql` (Row Level Security), `003_settings_members_challenges.sql` (votul alb, membrii comisiei, provocările de autentificare). |
+| `migrations/` | `001_init.sql` (primele nouă tabele, trigger-ul append-only pe `ballots`), `002_rls.sql` (Row Level Security), `003_settings_members_challenges.sql` (votul alb, membrii comisiei, provocările de autentificare), `004_require_nfc.sql` (setarea „doar NFC”). |
 | `src/config.ts`, `main.ts`, `app.ts`, `app.module.ts` | Configurarea din mediu, pornirea, construirea aplicației Nest (cu `helmet`, CORS, `trust proxy`), lista modulelor. |
 | `src/db/` | Pool-ul și tranzacțiile (`database.service.ts`), opțiunile SSL (`pg-options.ts`), migrările (`migrate.ts`, `migrate-cli.ts`). |
 | `src/common/` | `security.ts` (token-uri, comparație în timp constant, sesiuni HMAC), `throttle.ts` (limita strictă), `validate.ts`. |
@@ -33,6 +33,6 @@ Variabilele de mediu sunt explicate în `.env.example` și în [docs/GHID-COMPLE
 | `src/tally/` | Decriptările parțiale și publicarea rezultatului. |
 | `src/nfc/` | `passive-auth.ts` (verificarea SOD-ului), `passive-auth.service.ts` (certificatele CSCA), `test-pki.ts` (PKI și cipuri de test). |
 | `src/system/` | `/health`. |
-| `test/` | `election-flow.e2e.test.ts` (16 teste, tot fluxul pe PostgreSQL), `interval.e2e.test.ts` (5: intervalul, orele de pe board, închiderea automată), `commission.e2e.test.ts` (4: membri și roluri, modificare și ștergere, vot alb, scoaterea din lista de eligibili), `rate-limit.e2e.test.ts` (3), `cli.e2e.test.ts` (1: CLI-urile reale, și pe două fire), `pg-options.test.ts` (3, fără bază: SSL-ul conexiunii), `helpers.ts` (golește baza de test!). |
+| `test/` | `election-flow.e2e.test.ts` (16 teste, tot fluxul pe PostgreSQL), `interval.e2e.test.ts` (5: intervalul, orele de pe board, închiderea automată), `commission.e2e.test.ts` (5: membri și roluri, modificare și ștergere, vot alb, scoaterea din lista de eligibili, „doar NFC”), `rate-limit.e2e.test.ts` (3), `cli.e2e.test.ts` (1: CLI-urile reale, și pe două fire), `pg-options.test.ts` (3, fără bază: SSL-ul conexiunii), `helpers.ts` (golește baza de test!). |
 
 Rutele, tabelele și regulile de stare: [docs/DOCUMENTATIE.md §7](../../docs/DOCUMENTATIE.md#7-backend-ul-tabele-rute-reguli) și [docs/GHID-COMPLET.md, Părțile 6–7](../../docs/GHID-COMPLET.md#partea-6-baza-de-date-cele-unsprezece-tabele).

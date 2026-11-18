@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    name: Lint, format, teste (criptografie, API, backend pe PostgreSQL, CLI-uri)
+    name: Lint, format, teste (criptografie, API, backend pe PostgreSQL, CLI-uri, site)
     runs-on: ubuntu-latest
     services:
       postgres:

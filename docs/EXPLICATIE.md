@@ -148,7 +148,7 @@ Din punctele slabe găsite de analiză (`ANALIZA.md`) s-au rezolvat cele mai imp
 - **Trustees:** fișierul de cheie se poate cripta cu parolă (`tools/trustee/src/key-file.ts`, `password.ts`).
 - **Verificatorul** verifică și orele primirii (crescătoare și în interval).
 - **HTTPS în Docker Compose**, prin Caddy (`infra/Caddyfile`).
-- **Calitate:** `prettier` și `oxlint` la rădăcină, pași noi în CI, formatările comune mutate în `packages/api/src/format.ts`, CLI-urile testate ca procese separate. Testele au crescut de la 78 la 93, apoi la 111 după a doua verificare (verificarea în paralel, reparațiile găsite în Chrome, scoaterea din lista de eligibili; vezi `GHID-COMPLET.md`, 9.15–9.19).
+- **Calitate:** `prettier` și `oxlint` la rădăcină, pași noi în CI, formatările comune mutate în `packages/api/src/format.ts`, CLI-urile testate ca procese separate. Testele au crescut de la 78 la 93, apoi la 125 după a doua verificare (verificarea în paralel, reparațiile găsite în Chrome, scoaterea din lista de eligibili, testele site-ului, „doar NFC”, procesul-verbal; vezi `GHID-COMPLET.md`, 9.15–9.24).
 - **La verificarea finală (18 nov.)** s-au reparat două probleme: ora primirii se ia acum după blocarea board-ului (altfel două voturi simultane puteau intra în ordinea inversă orelor, iar verificatorul ar fi raportat fals o manipulare) și verificarea de sănătate a containerului backend folosește `127.0.0.1` (cu `localhost`, Docker îl marca „unhealthy”). Apoi tot sistemul a fost pornit cu Docker Compose și un scrutin complet a trecut prin HTTPS.
 
 ---
@@ -184,7 +184,7 @@ Din punctele slabe găsite de analiză (`ANALIZA.md`) s-au rezolvat cele mai imp
 
 | Fișier | Ce face |
 | --- | --- |
-| `ci.yml` | La fiecare push, pe serverele GitHub: instalează tot, rulează linterul și verificarea formatării, cele 111 teste (cu un PostgreSQL pornit ca serviciu), construiește tot și rulează `npm audit`; separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
+| `ci.yml` | La fiecare push, pe serverele GitHub: instalează tot, rulează linterul și verificarea formatării, cele 125 de teste (cu un PostgreSQL pornit ca serviciu; 11 dintre ele folosesc site-ul într-un browser simulat), construiește tot și rulează `npm audit`; separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
 | `android-apk.yml` | Construiește APK-ul. Pornește când se modifică aplicația mobilă sau pachetele comune, sau manual (Actions → Android APK → Run workflow). Pașii: Node 22 și Java 17, construirea pachetelor comune, `expo prebuild` (generează proiectul Android), `gradlew assembleRelease` (compilează; doar arm64, ca fișierul să fie mai mic), apoi copierea APK-ului în `apk/`, încărcarea lui ca artifact și commit-ul pe branch. Câmpul opțional `api_url` leagă APK-ul de un server real. |
 
 ## `packages/crypto/`: criptografia
@@ -461,12 +461,14 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 | `src/pages/About.tsx` | Explicația pentru public, cu formule. |
 | `src/pages/commission/CommissionList.tsx` | Tabelul scrutinelor pentru comisie; cine e autentificat și cu ce rol. |
 | `src/pages/commission/CommissionNew.tsx`, `CommissionEdit.tsx` | Crearea unui scrutin și modificarea lui în configurare. |
-| `src/pages/commission/ElectionForm.tsx` | Formularul comun: titlu, interval, candidați (cu reordonare), votul alb, trustees (doar la creare). |
+| `src/pages/commission/ElectionForm.tsx` | Formularul comun: titlu, interval, candidați (cu reordonare), votul alb, „doar NFC”, trustees (doar la creare). |
+| `src/pages/election/ProcesVerbal.tsx` | Procesul-verbal de tipărit: date generale, participare, rezultat, hash-ul board-ului, verificarea rulată din pagină, semnăturile; stilurile de tipărire în `styles/print.css`. |
 | `src/pages/commission/CommissionElection.tsx` | Pagina unui scrutin pentru comisie: starea, ceasul, modifică/șterge (în configurare), deschide/închide, trustees, opțiunile; restul în `parts/`. Observatorii văd tot, fără butoane. |
 | `src/pages/commission/CommissionMembers.tsx` | Membrii comisiei: creare (token afișat o dată), listă, revocare. |
 | `src/pages/commission/parts/` | `Steps` (etapele), `TrusteeTokens` (comenzile afișate o dată), `EligibleImport` (CSV-ul, și cu votul deschis), `BoardHead` (hash-ul de publicat independent), `AuditLog` (jurnalul, cu închiderea automată marcată), `MockToolsPanel` (uneltele de test, doar în mod simulat). |
 | `src/pages/election/ElectionPublic.tsx` | Pagina publică: statisticile, ceasul și cele cinci tab-uri. |
-| `src/pages/election/tabs/` | `BoardTab` (căutarea codului verifică local hash-urile; board-ul pe pagini de câte 50), `ResultTab` (votul alb separat), `VerificationTab` (verificatorul cu bară de progres și raport), `BenalohTab` (auditul unui buletin), `ParametersTab`. |
+| `src/pages/election/tabs/` | `BoardTab` (căutarea codului verifică local hash-urile; board-ul pe pagini de câte 50), `ResultTab` (votul alb separat), `VerificationTab` (verificatorul cu bară de progres și raport), `BenalohTab` (auditul unui buletin), `ParametersTab` (și felul înregistrării: OCR și NFC sau doar NFC). |
+| `vitest.config.ts`, `tsconfig.test.json`, `test/` | Cele 11 teste automate ale site-ului (Vitest, jsdom, Testing Library), pe backend-ul simulat: paginile publice și panoul comisiei. |
 | `src/lib/format.ts`, `src/lib/useAsync.ts` | Formatările (re-exportate din `@evoting/api`) și încărcarea asincronă a datelor în pagini. |
 | `src/lib/verify-workers.ts`, `src/lib/verify.worker.ts` | Verificarea publică în paralel, pe Web Workers (câte unul pe nucleu, cel mult 16). |
 | `src/lib/trusteeTokens.ts` | Token-urile trustees păstrate în `sessionStorage` până când comisia confirmă că le-a transmis; fișierul `.txt` cu comenzile. |
@@ -493,7 +495,7 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 | `src/app/_layout.tsx` | Navigarea: lista ecranelor și titlurile lor. |
 | `src/app/index.tsx` | Lista scrutinelor, cu etichetele „Înregistrat” și „Ai votat”. |
 | `src/app/scrutin/[id]/index.tsx` | Pagina unui scrutin: pașii alegătorului, acțiunea principală, candidații sau rezultatul. |
-| `src/app/scrutin/[id]/inregistrare.tsx` | Alegerea între scanare și NFC, plus explicația re-înregistrării (alt telefon, înainte de vot). |
+| `src/app/scrutin/[id]/inregistrare.tsx` | Alegerea între scanare și NFC (la un scrutin „doar NFC”, doar NFC, cu explicația de ce), plus explicația re-înregistrării (alt telefon, înainte de vot). |
 | `src/app/scrutin/[id]/ocr.tsx` | Trei moduri: Cameră (fotografie, OCR nativ, parsare MRZ), Text MRZ (introdus de mână sau „buletin de test”) și Doar CNP; apoi generează credentialul și se înregistrează. |
 | `src/app/scrutin/[id]/nfc.tsx` | CAN-ul (6 cifre), apoi „Citește cipul” (modulul nativ) sau „Simulează citirea cipului” (fără modul nativ, în mod simulat). Trimite DG1 și SOD la server. |
 | `src/app/scrutin/[id]/vot.tsx` | Alegerea candidatului, criptarea pe telefon, confirmarea, auditul Benaloh (recriptare după audit), trimiterea. |
