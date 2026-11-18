@@ -1,14 +1,18 @@
+// Înregistrarea prin scanarea buletinului: cameră + OCR nativ, text MRZ introdus de mână sau doar CNP.
+
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { generateCredential } from '@evoting/crypto'
 import { ApiError, api, checkCnp, mockTools, parseMrz, type MrzData } from '../../../api'
-import { Button, Card, Field, H2, LinkButton, Notice, P, Screen } from '../../../components/ui'
+import { ModeTabs } from '../../../components/identity/ModeTabs'
+import { MrzSummary } from '../../../components/identity/MrzSummary'
+import { Button, Card, Field, LinkButton, Notice, P, Screen } from '../../../components/ui'
 import { errorMessage } from '../../../lib/format'
 import { ocrModule } from '../../../lib/native'
 import { useSession } from '../../../lib/session'
-import { colors, mono } from '../../../lib/theme'
+import { mono } from '../../../lib/theme'
 
 type Mode = 'camera' | 'mrz' | 'cnp'
 
@@ -86,13 +90,15 @@ export default function OcrScreen() {
     await submit()
   }
 
+  const tabs: { key: Mode; label: string }[] = [
+    ...(ocrModule ? [{ key: 'camera' as const, label: 'Cameră' }] : []),
+    { key: 'mrz', label: 'Text MRZ' },
+    { key: 'cnp', label: 'Doar CNP' },
+  ]
+
   return (
     <Screen>
-      <View style={styles.tabs}>
-        {ocrModule && <Tab label="Cameră" active={mode === 'camera'} onPress={() => setMode('camera')} />}
-        <Tab label="Text MRZ" active={mode === 'mrz'} onPress={() => setMode('mrz')} />
-        <Tab label="Doar CNP" active={mode === 'cnp'} onPress={() => setMode('cnp')} />
-      </View>
+      <ModeTabs tabs={tabs} active={mode} onChange={setMode} />
 
       {mode === 'camera' && ocrModule && (
         <>
@@ -114,7 +120,9 @@ export default function OcrScreen() {
 
       {mode === 'mrz' && (
         <>
-          {!ocrModule && <Notice tone="warn" text="OCR-ul pe cameră are nevoie de modulul nativ (development build). Aici poți introduce rândurile MRZ de mână." />}
+          {!ocrModule && (
+            <Notice tone="warn" text="OCR-ul pe cameră are nevoie de modulul nativ (development build). Aici poți introduce rândurile MRZ de mână." />
+          )}
           <Field
             label="Rândurile MRZ"
             value={mrzText}
@@ -147,59 +155,23 @@ export default function OcrScreen() {
 
       {error && <Notice tone="bad" text={error} />}
       {notEligible && mockTools && <LinkButton title="Test: adaugă CNP-ul meu în lista de eligibili și reîncearcă" onPress={addSelfAndRetry} />}
-      <Button title="Confirmă și înregistrează-te" onPress={submit} disabled={!check.ok || (mode !== 'cnp' && !!mrzBlocks) || (mode !== 'cnp' && !mrz)} loading={busy && mode !== 'camera'} />
+      <Button
+        title="Confirmă și înregistrează-te"
+        onPress={submit}
+        disabled={!check.ok || (mode !== 'cnp' && !!mrzBlocks) || (mode !== 'cnp' && !mrz)}
+        loading={busy && mode !== 'camera'}
+      />
       <P muted>
-        Telefonul generează o cheie de credential, iar serverul o leagă de amprenta HMAC a CNP-ului, fără să păstreze CNP-ul. Nivel de încredere:
-        optic (un buletin fals bine printat ar trece; pentru verificare criptografică folosește NFC).
+        Telefonul generează o cheie de credential, iar serverul o leagă de amprenta HMAC a CNP-ului, fără să păstreze CNP-ul. Nivel de încredere: optic (un
+        buletin fals bine printat ar trece; pentru verificare criptografică folosește NFC).
       </P>
     </Screen>
   )
 }
 
-function Tab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Text onPress={onPress} style={[styles.tab, active && styles.tabActive]}>
-      {label}
-    </Text>
-  )
-}
-
-function MrzSummary({ mrz }: { mrz: MrzData }) {
-  return (
-    <Card style={{ borderColor: mrz.valid && mrz.cnp && !mrz.expired ? colors.okLine : colors.line2 }}>
-      <H2>Date citite ({mrz.format === 'TD2' ? 'buletin' : mrz.format === 'TD1' ? 'CEI' : 'pașaport'})</H2>
-      <Row label="Nume" value={`${mrz.surname} ${mrz.givenNames}`.trim()} />
-      <Row label="Document" value={mrz.documentNumber} />
-      <Row label="Data nașterii" value={mrz.birthDate} />
-      <Row label="Expiră" value={mrz.expiryDate} bad={mrz.expired} />
-      <Row label="CNP" value={mrz.cnp ?? 'nu a putut fi reconstituit'} bad={!mrz.cnp} />
-      {mrz.checks.map((c) => (
-        <Row key={c.field} label={`Control: ${c.field}`} value={c.ok ? '✓' : '✗'} bad={!c.ok} />
-      ))}
-      {!mrz.valid && <Notice tone="bad" text="Cifrele de control nu se potrivesc: citirea e greșită. Rescanează sau corectează textul." />}
-      {mrz.expired && <Notice tone="bad" text="Documentul este expirat." />}
-    </Card>
-  )
-}
-
-function Row({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, bad && { color: colors.bad }]}>{value}</Text>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 18, backgroundColor: colors.surface2, color: colors.ink2, fontWeight: '600', overflow: 'hidden' },
-  tabActive: { backgroundColor: colors.accent, color: '#fff' },
   cameraBox: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#0e1726' },
   camera: { width: '100%', aspectRatio: 1.4 },
   frame: { position: 'absolute', left: 16, right: 16, bottom: 40, height: 70, borderWidth: 2, borderColor: '#7ea0ff', borderStyle: 'dashed', borderRadius: 10 },
   cameraText: { color: '#c7d4f5', fontSize: 13, textAlign: 'center', padding: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 2 },
-  rowLabel: { fontSize: 14, color: colors.ink2 },
-  rowValue: { fontSize: 14, fontWeight: '600', color: colors.ink, flexShrink: 1, textAlign: 'right' },
 })

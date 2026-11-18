@@ -1,0 +1,11 @@
+/* Stilurile site-ului, pe module. Ordinea contează: regulile de mai jos le pot suprascrie pe cele de sus. */
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+@import './cards.css';
+@import './forms.css';
+@import './feedback.css';
+@import './tables.css';
+@import './results.css';
+@import './verification.css';
+@import './responsive.css';

@@ -19,10 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "ro.udjg.evoting",
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.NFC"
-      ]
+      "permissions": ["android.permission.CAMERA", "android.permission.NFC"]
     },
     "web": {
       "favicon": "./assets/favicon.png",

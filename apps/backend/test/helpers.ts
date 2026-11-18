@@ -1,9 +1,13 @@
+// Ajutoare pentru testele end-to-end: baza de test (o golește!), pornirea serverului
+// pe un port liber și clienți API cu și fără token de comisie.
+
+import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import pg from 'pg'
-import { createHttpClient, type ApiClient } from '@evoting/api'
+import { ApiError, createHttpClient, type ApiClient, type CreateElectionInput } from '@evoting/api'
 import { createApp } from '../src/app.js'
 import type { AppConfig } from '../src/config.js'
 import { createTestPki, type TestPki } from '../src/nfc/test-pki.js'
@@ -44,10 +48,14 @@ export interface TestServer {
   api: ApiClient
   /** Clientul fără token de comisie. */
   anonymous: ApiClient
+  /** Un client cu alt token de comisie (de exemplu al unui membru). */
+  as(token: string): ApiClient
   config: AppConfig
   pki: TestPki
   close(): Promise<void>
 }
+
+export const ADMIN_TOKEN = 'token-comisie-de-test-1234'
 
 export async function startServer(overrides: Partial<AppConfig> = {}): Promise<TestServer> {
   const pki = await createTestPki()
@@ -57,13 +65,16 @@ export async function startServer(overrides: Partial<AppConfig> = {}): Promise<T
   const config: AppConfig = {
     databaseUrl: TEST_DB,
     cnpHmacKey: randomBytes(32).toString('hex'),
-    adminToken: 'token-comisie-de-test-1234',
+    adminToken: ADMIN_TOKEN,
     sessionSecret: randomBytes(32).toString('hex'),
     cscaDir: dir,
     port: 0,
     corsOrigins: true,
     rateLimit: false,
     sensitiveLimit: 30,
+    autoCloseIntervalMs: 0,
+    trustProxy: 0,
+    production: false,
     ...overrides,
   }
   const app = await createApp(config, { logger: false })
@@ -74,8 +85,33 @@ export async function startServer(overrides: Partial<AppConfig> = {}): Promise<T
     url,
     api: createHttpClient(url, { getAdminToken: () => config.adminToken }),
     anonymous: createHttpClient(url),
+    as: (token) => createHttpClient(url, { getAdminToken: () => token }),
     config,
     pki,
     close: () => app.close(),
   }
 }
+
+/** Pentru assert.rejects: eroarea e un ApiError cu codul dat (și, opțional, un mesaj care se potrivește). */
+export const rejects = (status: number, pattern?: RegExp) => (err: unknown) => {
+  assert.ok(err instanceof ApiError, String(err))
+  assert.equal(err.status, status, err.message)
+  if (pattern) assert.match(err.message, pattern)
+  return true
+}
+
+const HOUR = 3600_000
+
+/** Un scrutin de test, deschis de o oră și cu închiderea peste o zi, cu trei candidați și doi trustees. */
+export const electionInput = (over: Partial<CreateElectionInput> = {}): CreateElectionInput => ({
+  title: 'Consiliul Facultății – test',
+  opensAt: new Date(Date.now() - HOUR).toISOString(),
+  closesAt: new Date(Date.now() + 24 * HOUR).toISOString(),
+  candidates: [
+    { name: 'Ana', description: 'Calculatoare' },
+    { name: 'Bogdan', description: 'Automatică' },
+    { name: 'Corina', description: 'Electronică' },
+  ],
+  trustees: [{ name: 'Comisia' }, { name: 'Observatori' }],
+  ...over,
+})

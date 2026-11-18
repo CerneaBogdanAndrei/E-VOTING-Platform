@@ -1,8 +1,11 @@
+// Verificarea votului: caută codul pe board și recalculează local hash-urile.
+
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text } from 'react-native'
 import { checkOwnEntry, normalizeTrackingCode } from '@evoting/crypto'
 import { api, ApiError, type BoardEntry } from '../../../api'
+import { KeyValueRow } from '../../../components/identity/KeyValueRow'
 import { Button, Card, Field, H2, Notice, P, Screen } from '../../../components/ui'
 import { errorMessage, formatDateTime, shortHash } from '../../../lib/format'
 import { useSession } from '../../../lib/session'
@@ -30,7 +33,12 @@ export default function VerifyScreen() {
       const check = checkOwnEntry(id, entry, { trackingCode, ballotHash: own?.ballotHash })
       setIntegrity(
         check.ok
-          ? { ok: true, text: own ? 'Hash-urile recalculate pe telefon corespund, iar conținutul e identic cu buletinul trimis de pe acest telefon.' : 'Hash-urile recalculate pe telefon corespund codului.' }
+          ? {
+              ok: true,
+              text: own
+                ? 'Hash-urile recalculate pe telefon corespund, iar conținutul e identic cu buletinul trimis de pe acest telefon.'
+                : 'Hash-urile recalculate pe telefon corespund codului.',
+            }
           : { ok: false, text: check.reason },
       )
       setFound(entry)
@@ -44,8 +52,7 @@ export default function VerifyScreen() {
   return (
     <Screen>
       <P>
-        Board-ul e public: oricine vede toate buletinele criptate. Caută-l pe al tău după codul de urmărire ca să confirmi că a ajuns și n-a fost
-        modificat.
+        Board-ul e public: oricine vede toate buletinele criptate. Caută-l pe al tău după codul de urmărire ca să confirmi că a ajuns și n-a fost modificat.
       </P>
       <Field
         label="Cod de urmărire"
@@ -62,10 +69,10 @@ export default function VerifyScreen() {
       {found && (
         <Card style={{ borderColor: colors.okLine, backgroundColor: colors.okSoft }}>
           <H2>Buletinul e pe board</H2>
-          <Row label="Poziție" value={`#${found.seq}`} />
-          <Row label="Primit" value={formatDateTime(found.receivedAt)} />
-          <Row label="Hash anterior" value={shortHash(found.prevHash)} mono />
-          <Row label="Criptotexte" value={`${found.ciphertexts.length} × (A, B)`} />
+          <KeyValueRow label="Poziție" value={`#${found.seq}`} />
+          <KeyValueRow label="Primit" value={formatDateTime(found.receivedAt)} />
+          <KeyValueRow label="Hash anterior" value={shortHash(found.prevHash)} mono />
+          <KeyValueRow label="Criptotexte" value={`${found.ciphertexts.length} × (A, B)`} />
           <Text style={[styles.note, integrity && !integrity.ok && { color: colors.bad }]}>
             {integrity?.text} Codul depinde și de hash-ul anterior, deci o modificare a buletinelor dinaintea lui l-ar schimba.
           </Text>
@@ -81,18 +88,6 @@ export default function VerifyScreen() {
   )
 }
 
-function Row({ label, value, mono: isMono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, isMono && mono]}>{value}</Text>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  rowLabel: { fontSize: 14, color: colors.ink2 },
-  rowValue: { fontSize: 14, fontWeight: '600', color: colors.ink },
   note: { fontSize: 13, lineHeight: 19, color: '#0b6b4a', marginTop: 4 },
 })

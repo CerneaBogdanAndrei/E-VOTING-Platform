@@ -2,14 +2,7 @@
 // e 0 sau 1 și că suma e 1, plus semnătura credentialului peste tot ansamblul.
 
 import { authMessage, signMessage, verifySignature } from './credential.js'
-import {
-  addCiphertexts,
-  decodeCiphertext,
-  encodeCiphertext,
-  encryptPoints,
-  preparePublicKey,
-  type CiphertextPoints,
-} from './elgamal.js'
+import { addCiphertexts, decodeCiphertext, encodeCiphertext, encryptPoints, preparePublicKey, type CiphertextPoints } from './elgamal.js'
 import { G, modQ, randomNonZeroScalar, scalarFromHex, scalarToHex } from './group.js'
 import { hashObject } from './hash.js'
 import { DOMAIN, proveEqualLogs, proveZeroOne, verifyEqualLogs, verifyZeroOne } from './proofs.js'

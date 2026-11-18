@@ -1,0 +1,45 @@
+/* Rezultatul scrutinului: bare proporționale cu numărul de voturi. */
+.results {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 20px;
+}
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 2fr 80px;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.result-row:last-child {
+  border-bottom: none;
+}
+.result-name,
+.result-num {
+  display: grid;
+}
+.result-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.result-bar {
+  height: 12px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.result-fill {
+  height: 100%;
+  background: #a9bdf5;
+  border-radius: 999px;
+}
+.result-lead {
+  background: var(--accent);
+}
+
+.result-blank {
+  color: var(--muted);
+  border-top: 1px dashed var(--line-2);
+}

@@ -1,16 +1,7 @@
 // ElGamal exponențial: Enc(m) = (rG, mG + rY). Mesajul stă în exponent, deci
 // produsul (aici suma, în notație aditivă) a două criptotexte criptează suma mesajelor.
 
-import {
-  encodeSmall,
-  G,
-  mulSecret,
-  pointFromHex,
-  pointToHex,
-  randomNonZeroScalar,
-  ZERO,
-  type Point as PointT,
-} from './group.js'
+import { encodeSmall, G, mulSecret, pointFromHex, pointToHex, randomNonZeroScalar, ZERO, type Point as PointT } from './group.js'
 import type { Ciphertext } from './types.js'
 
 export interface CiphertextPoints {

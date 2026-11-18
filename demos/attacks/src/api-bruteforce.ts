@@ -34,11 +34,16 @@ for (let i = 1; i <= attempts; i++) {
   if (status === 429 && firstBlocked === null) firstBlocked = i
 }
 for (const [status, n] of [...counts].sort()) {
-  const label = status === 401 ? 'token greșit' : status === 429 ? '\x1b[32mblocat (Too Many Requests)\x1b[0m' : status === 204 ? '\x1b[31mtoken ghicit!\x1b[0m' : ''
+  const label =
+    status === 401 ? 'token greșit' : status === 429 ? '\x1b[32mblocat (Too Many Requests)\x1b[0m' : status === 204 ? '\x1b[31mtoken ghicit!\x1b[0m' : ''
   console.log(`  ${status}: ${n} cereri  ${label}`)
 }
-console.log(`\n${firstBlocked ? `Blocat de la încercarea #${firstBlocked}` : 'Nu a fost blocat: backend-ul rulează cu RATE_LIMIT=off?'}, în ${((performance.now() - t) / 1000).toFixed(1)} s.`)
+console.log(
+  `\n${firstBlocked ? `Blocat de la încercarea #${firstBlocked}` : 'Nu a fost blocat: backend-ul rulează cu RATE_LIMIT=off?'}, în ${((performance.now() - t) / 1000).toFixed(1)} s.`,
+)
 if (firstBlocked) {
   const perMinute = firstBlocked - 1
-  console.log(`Cu ${perMinute} încercări pe minut, un token de 24 de octeți (2¹⁹² variante) ar cere ~10^${Math.round(192 * Math.log10(2) - Math.log10(perMinute * 525_600))} ani.`)
+  console.log(
+    `Cu ${perMinute} încercări pe minut, un token de 24 de octeți (2¹⁹² variante) ar cere ~10^${Math.round(192 * Math.log10(2) - Math.log10(perMinute * 525_600))} ani.`,
+  )
 }

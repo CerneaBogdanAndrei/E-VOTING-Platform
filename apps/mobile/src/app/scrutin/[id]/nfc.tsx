@@ -108,9 +108,7 @@ export default function NfcScreen() {
       />
 
       {error && <Notice tone="bad" text={error} />}
-      {notEligible && mockTools && lastRead && (
-        <LinkButton title="Test: adaugă CNP-ul meu în lista de eligibili și reîncearcă" onPress={addSelfAndRetry} />
-      )}
+      {notEligible && mockTools && lastRead && <LinkButton title="Test: adaugă CNP-ul meu în lista de eligibili și reîncearcă" onPress={addSelfAndRetry} />}
       {nfcModule?.isSupported() ? (
         <Button title={busy ? 'Ține telefonul lângă buletin…' : 'Citește cipul'} onPress={read} disabled={can.length !== 6} loading={busy} />
       ) : mockTools ? (

@@ -55,13 +55,32 @@ async function makeCert(opts: { subject: string; issuer: string; publicKey: Cryp
 }
 
 const toPem = (der: ArrayBuffer, label: string) =>
-  `-----BEGIN ${label}-----\n${Buffer.from(der).toString('base64').match(/.{1,64}/g)!.join('\n')}\n-----END ${label}-----\n`
+  `-----BEGIN ${label}-----\n${Buffer.from(der)
+    .toString('base64')
+    .match(/.{1,64}/g)!
+    .join('\n')}\n-----END ${label}-----\n`
 
 export async function createTestPki(): Promise<TestPki> {
   const csca = await webcrypto.subtle.generateKey(EC, true, ['sign', 'verify'])
   const dsc = await webcrypto.subtle.generateKey(EC, true, ['sign', 'verify'])
-  const cscaCert = await makeCert({ subject: 'CSCA TEST', issuer: 'CSCA TEST', publicKey: csca.publicKey, signingKey: csca.privateKey, serial: 1, ca: true, days: 3650 })
-  const dscCert = await makeCert({ subject: 'Document Signer TEST', issuer: 'CSCA TEST', publicKey: dsc.publicKey, signingKey: csca.privateKey, serial: 2, ca: false, days: 1095 })
+  const cscaCert = await makeCert({
+    subject: 'CSCA TEST',
+    issuer: 'CSCA TEST',
+    publicKey: csca.publicKey,
+    signingKey: csca.privateKey,
+    serial: 1,
+    ca: true,
+    days: 3650,
+  })
+  const dscCert = await makeCert({
+    subject: 'Document Signer TEST',
+    issuer: 'CSCA TEST',
+    publicKey: dsc.publicKey,
+    signingKey: csca.privateKey,
+    serial: 2,
+    ca: false,
+    days: 1095,
+  })
   return {
     cscaCertPem: toPem(cscaCert.toSchema().toBER(), 'CERTIFICATE'),
     dscCertDer: new Uint8Array(dscCert.toSchema().toBER()),
@@ -76,7 +95,11 @@ export async function saveTestPki(pki: TestPki, dir: string) {
   const pkcs8 = await webcrypto.subtle.exportKey('pkcs8', pki.dscPrivateKey)
   await writeFile(
     join(dir, 'test-dsc.json'),
-    JSON.stringify({ cscaCertPem: pki.cscaCertPem, dscCertDer: Buffer.from(pki.dscCertDer).toString('base64'), dscPrivateKeyPkcs8: Buffer.from(pkcs8).toString('base64') }, null, 2),
+    JSON.stringify(
+      { cscaCertPem: pki.cscaCertPem, dscCertDer: Buffer.from(pki.dscCertDer).toString('base64'), dscPrivateKeyPkcs8: Buffer.from(pkcs8).toString('base64') },
+      null,
+      2,
+    ),
     { mode: 0o600 },
   )
 }

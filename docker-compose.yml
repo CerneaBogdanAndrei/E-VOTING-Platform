@@ -1,5 +1,6 @@
 # Pornirea întregului sistem pentru demo: docker compose up --build
-# Apoi: web pe http://localhost:8080, API pe http://localhost:3000.
+# Apoi: https://localhost (site + API la /api, prin Caddy, certificat local)
+#       sau direct: web pe http://localhost:8080, API pe http://localhost:3000.
 # Secretele vin din fișierul .env de lângă acest fișier (vezi .env.example).
 
 services:
@@ -12,7 +13,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U evoting -d evoting"]
+      test: ['CMD-SHELL', 'pg_isready -U evoting -d evoting']
       interval: 3s
       timeout: 3s
       retries: 20
@@ -25,9 +26,11 @@ services:
       db:
         condition: service_healthy
     environment:
+      NODE_ENV: production
       # Supabase: pune DATABASE_URL în .env; necompletat = baza locală din containerul db
       DATABASE_URL: ${DATABASE_URL:-postgres://evoting:${POSTGRES_PASSWORD:-evoting}@db:5432/evoting}
-      DATABASE_SSL: "off"
+      # baza locală din container nu are SSL; pentru Supabase pune DATABASE_SSL=on în .env
+      DATABASE_SSL: ${DATABASE_SSL:-off}
       CNP_HMAC_KEY: ${CNP_HMAC_KEY:?setează CNP_HMAC_KEY în .env (openssl rand -hex 32)}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?setează ADMIN_TOKEN în .env}
       SESSION_SECRET: ${SESSION_SECRET:-}
@@ -35,13 +38,17 @@ services:
       PKI_DIR: /pki
       GENERATE_TEST_PKI: ${GENERATE_TEST_PKI:-true}
       RATE_LIMIT: ${RATE_LIMIT:-on}
-      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # originile din care browserul poate chema API-ul: site-ul prin Caddy și direct
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://localhost,http://localhost:8080}
+      # în spatele lui Caddy, adresa IP a clientului vine din X-Forwarded-For
+      TRUST_PROXY: '1'
     volumes:
       - pki:/pki
     ports:
-      - "3000:3000"
+      - '3000:3000'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      # 127.0.0.1, nu localhost: în container localhost e ::1 (IPv6), iar serverul ascultă pe IPv4
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/health || exit 1']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -51,12 +58,28 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+        # adresa API-ului văzută din browser; prin Caddy e /api pe același host
+        VITE_API_URL: ${PUBLIC_API_URL:-https://localhost/api}
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - '8080:80'
+
+  proxy:
+    image: caddy:2-alpine
+    depends_on:
+      - web
+      - backend
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    ports:
+      - '443:443'
+      - '80:80'
 
 volumes:
   pgdata:
   pki:
+  caddy_data:

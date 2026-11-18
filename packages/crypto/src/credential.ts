@@ -43,5 +43,4 @@ export function verifySignature(publicKeyHex: string, message: string, signature
 }
 
 /** Mesajul semnat la autentificare: leagă nonce-ul serverului de scrutin și de credential. */
-export const authMessage = (electionId: string, credentialPubkey: string, nonce: string) =>
-  `evoting/v1/auth|${electionId}|${credentialPubkey}|${nonce}`
+export const authMessage = (electionId: string, credentialPubkey: string, nonce: string) => `evoting/v1/auth|${electionId}|${credentialPubkey}|${nonce}`

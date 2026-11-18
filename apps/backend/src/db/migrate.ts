@@ -27,7 +27,7 @@ export async function migrate(databaseUrl: string, log: (msg: string) => void = 
         await client.query('COMMIT')
       } catch (err) {
         await client.query('ROLLBACK')
-        throw new Error(`Migrarea ${file} a eșuat: ${(err as Error).message}`)
+        throw new Error(`Migrarea ${file} a eșuat: ${(err as Error).message}`, { cause: err })
       }
       applied.push(file)
       log(`migrare aplicată: ${file}`)

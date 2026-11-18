@@ -1,15 +1,8 @@
 // Pașii alegătorului din aplicație, comuni pentru mobil, simulator și teste:
 // autentificare cu credentialul, criptarea buletinului, trimiterea și verificarea.
 
-import {
-  authMessage,
-  checkOwnEntry,
-  encryptBallot,
-  signMessage,
-  type ElectionParams,
-  type EncryptedBallot,
-} from '@evoting/crypto'
-import type { ApiClient, BallotReceipt, Election } from './types.js'
+import { authMessage, checkOwnEntry, encryptBallot, signMessage, type ElectionParams, type EncryptedBallot } from '@evoting/crypto'
+import type { ApiClient, BallotReceipt, Election } from './contract/index.js'
 
 export interface VoterCredential {
   secretKey: string
@@ -39,13 +32,14 @@ export async function submitBallot(api: ApiClient, election: Election, credentia
   return api.castBallot(election.id, prepared.ballot, token)
 }
 
-export type OwnBallotCheck =
-  | { status: 'ok'; seq: number }
-  | { status: 'missing' }
-  | { status: 'modified'; reason: string }
+export type OwnBallotCheck = { status: 'ok'; seq: number } | { status: 'missing' } | { status: 'modified'; reason: string }
 
 /** Caută buletinul pe board după cod și verifică local că e exact cel trimis. */
-export async function verifyOwnBallot(api: ApiClient, electionId: string, receipt: Pick<BallotReceipt, 'trackingCode' | 'ballotHash'>): Promise<OwnBallotCheck> {
+export async function verifyOwnBallot(
+  api: ApiClient,
+  electionId: string,
+  receipt: Pick<BallotReceipt, 'trackingCode' | 'ballotHash'>,
+): Promise<OwnBallotCheck> {
   let entry
   try {
     entry = await api.findBallot(electionId, receipt.trackingCode)

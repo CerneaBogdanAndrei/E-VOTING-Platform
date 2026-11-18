@@ -4,7 +4,9 @@
   "private": true,
   "description": "Verificatorul public: refă toate dovezile unui scrutin",
   "type": "module",
-  "bin": { "evoting-verify": "dist/cli.js" },
+  "bin": {
+    "evoting-verify": "dist/cli.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"

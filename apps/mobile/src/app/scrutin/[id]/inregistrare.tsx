@@ -30,8 +30,7 @@ export default function RegistrationScreen() {
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.title}>Citește cartea electronică (CEI)</Text>
             <Text style={styles.text}>
-              Apropii telefonul de buletin și datele se citesc automat de pe cip. Semnătura digitală a statului confirmă că documentul e
-              autentic.
+              Apropii telefonul de buletin și datele se citesc automat de pe cip. Semnătura digitală a statului confirmă că documentul e autentic.
             </Text>
           </View>
         </View>
@@ -42,8 +41,11 @@ export default function RegistrationScreen() {
       </Card>
 
       <Text style={styles.privacy}>
-        CNP-ul nu se păstrează nicăieri în clar: serverul reține doar o amprentă HMAC, din care nu se poate reconstitui. Poza și adresa nu
-        părăsesc telefonul.
+        CNP-ul nu se păstrează nicăieri în clar: serverul reține doar o amprentă HMAC, din care nu se poate reconstitui. Poza și adresa nu părăsesc telefonul.
+      </Text>
+      <Text style={styles.privacy}>
+        Ai schimbat telefonul? Dacă nu ai votat încă, te poți înregistra din nou de pe acesta: cheia veche devine invalidă. O înregistrare prin NFC se poate
+        înlocui doar tot prin NFC. După vot, înregistrarea nu se mai poate schimba.
       </Text>
     </Screen>
   )
