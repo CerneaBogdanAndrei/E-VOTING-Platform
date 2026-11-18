@@ -13,7 +13,7 @@ import { createHttpClient } from '@evoting/api'
 import { decrypt } from './commands/decrypt.js'
 import { keygen } from './commands/keygen.js'
 import { status } from './commands/status.js'
-import { die } from './output.js'
+import { CliExit, die, errorLine } from './output.js'
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
@@ -53,5 +53,6 @@ try {
   else if (command === 'status') await status(createHttpClient(api), values.election)
   else die(`comandă necunoscută: ${command}\n\n${HELP}`)
 } catch (err) {
-  die(err instanceof Error ? err.message : String(err))
+  if (!(err instanceof CliExit)) errorLine(err instanceof Error ? err.message : String(err))
+  process.exitCode = err instanceof CliExit ? err.code : 1
 }

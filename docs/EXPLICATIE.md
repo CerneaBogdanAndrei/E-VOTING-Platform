@@ -148,7 +148,7 @@ Din punctele slabe găsite de analiză (`ANALIZA.md`) s-au rezolvat cele mai imp
 - **Trustees:** fișierul de cheie se poate cripta cu parolă (`tools/trustee/src/key-file.ts`, `password.ts`).
 - **Verificatorul** verifică și orele primirii (crescătoare și în interval).
 - **HTTPS în Docker Compose**, prin Caddy (`infra/Caddyfile`).
-- **Calitate:** `prettier` și `oxlint` la rădăcină, pași noi în CI, formatările comune mutate în `packages/api/src/format.ts`, CLI-urile testate ca procese separate. Testele au crescut de la 78 la 93.
+- **Calitate:** `prettier` și `oxlint` la rădăcină, pași noi în CI, formatările comune mutate în `packages/api/src/format.ts`, CLI-urile testate ca procese separate. Testele au crescut de la 78 la 93, apoi la 125 după a doua verificare (verificarea în paralel, reparațiile găsite în Chrome, scoaterea din lista de eligibili, testele site-ului, „doar NFC”, procesul-verbal; vezi `GHID-COMPLET.md`, 9.15–9.24).
 - **La verificarea finală (18 nov.)** s-au reparat două probleme: ora primirii se ia acum după blocarea board-ului (altfel două voturi simultane puteau intra în ordinea inversă orelor, iar verificatorul ar fi raportat fals o manipulare) și verificarea de sănătate a containerului backend folosește `127.0.0.1` (cu `localhost`, Docker îl marca „unhealthy”). Apoi tot sistemul a fost pornit cu Docker Compose și un scrutin complet a trecut prin HTTPS.
 
 ---
@@ -184,7 +184,7 @@ Din punctele slabe găsite de analiză (`ANALIZA.md`) s-au rezolvat cele mai imp
 
 | Fișier | Ce face |
 | --- | --- |
-| `ci.yml` | La fiecare push, pe serverele GitHub: instalează tot, rulează linterul și verificarea formatării, cele 93 de teste (cu un PostgreSQL pornit ca serviciu), construiește tot și rulează `npm audit`; separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
+| `ci.yml` | La fiecare push, pe serverele GitHub: instalează tot, rulează linterul și verificarea formatării, cele 125 de teste (cu un PostgreSQL pornit ca serviciu; 11 dintre ele folosesc site-ul într-un browser simulat), construiește tot și rulează `npm audit`; separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
 | `android-apk.yml` | Construiește APK-ul. Pornește când se modifică aplicația mobilă sau pachetele comune, sau manual (Actions → Android APK → Run workflow). Pașii: Node 22 și Java 17, construirea pachetelor comune, `expo prebuild` (generează proiectul Android), `gradlew assembleRelease` (compilează; doar arm64, ca fișierul să fie mai mic), apoi copierea APK-ului în `apk/`, încărcarea lui ca artifact și commit-ul pe branch. Câmpul opțional `api_url` leagă APK-ul de un server real. |
 
 ## `packages/crypto/`: criptografia
@@ -289,7 +289,8 @@ Cheia alegătorului, de tip Ed25519.
 
 ### `src/tally.ts`
 
-- `computeAggregate(n, buletine)`: pentru fiecare candidat, suma criptotextelor de pe board.
+- `computeAggregate(n, buletine, offset)`: pentru fiecare candidat, suma criptotextelor de pe board (sau dintr-o bucată a lui, care începe la poziția `offset`).
+- `sumAggregates(n, părți)`: suma unor agregate parțiale; dă exact agregatul întregului board, pentru că adunarea punctelor e asociativă.
 - `babyStepGiantStep(punct, maxim)`: găsește t cu t·G = punct, pentru t între 0 și maxim, în aproximativ √maxim pași.
   1. Își face o listă cu 0·G, 1·G, …, (m−1)·G („pașii mici”).
   2. Scade din punct câte m·G („pașii mari”) până dă de un element din listă.
@@ -308,7 +309,16 @@ Verificatorul public. `verifyElection(pachet, opțiuni)` primește tot ce public
 | 4. Agregatul | Recalculat de la zero și comparat cu cel publicat |
 | 5. Decriptarea | Dovezile trustees, apoi totalurile recalculate și comparate cu rezultatul publicat |
 
-Fiecare eroare e raportată cu locul exact, de exemplu „buletinul #42”. Opțiunea `yieldEvery` lasă browserul să respire între buletine, ca pagina să nu înghețe.
+Fiecare eroare e raportată cu locul exact, de exemplu „buletinul #42”; o intrare care nici nu are forma unei intrări e raportată („Intrare malformată”), fără să oprească verificarea. Opțiunea `yieldEvery` lasă browserul să respire între buletine, ca pagina să nu înghețe. Opțiunea `work` spune cine face partea scumpă (semnăturile, dovezile, agregatul): implicit firul curent, sau mai multe fire (`parallel.ts`).
+
+### `src/parallel.ts` și `src/node/`
+
+Verificarea în paralel. Buletinele sunt independente, deci se pot verifica pe mai multe nuclee deodată.
+
+- `sequentialWork()`: totul pe firul curent, intrare cu intrare (comportamentul implicit; așa rulează și pe telefon).
+- `createParallelWork(spawn, fire)`: bazinul de lucrători. Împarte board-ul în bucăți (cam patru per fir, între 4 și 64 de buletine), dă fiecare bucată primului fir liber și pune rezultatele la loc în ordinea board-ului, deci raportul e identic. Dacă mai multe bucăți au erori, se raportează cea dintâi de pe board, ca pe un singur fir. Dacă un fir cade, verificarea se oprește cu eroare.
+- `handleWorkRequest(cerere)`: ce face un fir cu o bucată (semnături, dovezi sau agregatul parțial). Aceeași funcție în Node și în browser.
+- `src/node/parallel.ts` (`@evoting/crypto/node`): `createNodeWork(fire)` pornește `worker_threads` care rulează `src/node/worker.ts`; `defaultThreads()` e numărul de nuclee. Folderul se compilează separat (`tsconfig.node.json`), ca restul bibliotecii să nu depindă de Node.
 
 ### `src/index.ts`
 
@@ -316,7 +326,7 @@ Exportă tot ce folosesc celelalte pachete.
 
 ### `test/`
 
-45 de teste, câte un fișier pe temă:
+54 de teste, câte un fișier pe temă:
 
 | Fișier | Ce verifică |
 | --- | --- |
@@ -325,6 +335,7 @@ Exportă tot ce folosesc celelalte pachete.
 | `ballot.test.ts` | Buletin corect acceptat; respinse: vot 2, vot −1, suma 2, suma 0, „viclean” +2/−1, dovezi refolosite în alt scrutin, buletin copiat de alt credential, criptotext înlocuit, formă greșită; Benaloh. |
 | `trustee.test.ts` | Dovada cheii legată de scrutin și trustee, chei invalide, cheie secretă nepotrivită, decriptarea cere toți trustees, trustee care trișează. |
 | `verifier.test.ts` | 13 tipuri de manipulare (buletin modificat, hash-uri refăcute, ordine schimbată, buletin șters, vot adăugat, vot dublu, decriptare modificată, rezultat falsificat, agregat greșit, istorie rescrisă, cheie fără dovadă, ore în afara ordinii sau a intervalului), scrutin încă deschis, progresul raportat. |
+| `parallel.test.ts` | Verificarea pe `worker_threads` reale dă exact raportul de pe un fir (și cu buletine trișate), ordinea rezultatelor, agregatul pe bucăți, un fir căzut, o intrare malformată, auditul Benaloh cu date incomplete, cheile Ed25519 de ordin mic. |
 | `helpers.ts` | `simulateElection` (un scrutin complet fără server), `testKey` și `forgeBallot` (buletin „trișat”). |
 
 ### `package.json`, `tsconfig*.json`, `.gitignore`
@@ -356,7 +367,7 @@ Numele pachetului (`@evoting/crypto`), comenzile `build` și `test` și setăril
 | `src/identity/dg1.ts` | DG1 e structura `61 { 5F1F <MRZ> }`: scoate MRZ-ul din DG1 (și invers, pentru teste), base64 ↔ octeți. |
 | `src/voter.ts` | Pașii alegătorului: `authenticate`, `prepareBallot`, `submitBallot`, `verifyOwnBallot`. |
 | `src/format.ts` | Etichetele și formatările comune site-ului și aplicației: stări, metode, niveluri, roluri, „Vot alb”, date, hash-uri, procente, durate, poziția față de interval (`intervalPhase`). |
-| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts` | 20 de teste: CNP, exemplele oficiale ICAO, buletinul vechi, CEI, zgomot OCR, DG1 și, pe backend-ul simulat, un scrutin complet verificat de verificatorul public, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii. |
+| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts`, `format.test.ts` | 25 de teste: acordul numeralelor și duratele în română, lista CSV de CNP-uri, scoaterea din lista de eligibili pe backend-ul simulat, CNP, exemplele oficiale ICAO, buletinul vechi, CEI, zgomot OCR, DG1 și, pe backend-ul simulat, un scrutin complet verificat de verificatorul public, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii. |
 
 ## `apps/backend/`: serverul
 
@@ -431,7 +442,8 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 | `test/interval.e2e.test.ts` | 5 teste: vot înainte de deschidere, deschidere cu închiderea în trecut, 16 voturi simultane cu ore crescătoare care trec de verificator, ceasuri diferite pe instanțe (`boardTime`), închiderea automată. |
 | `test/commission.e2e.test.ts` | 3 teste: membrii comisiei și rolurile (observatorul doar citește, revocarea, numele în jurnal), modificarea și ștergerea doar în configurare, votul alb. |
 | `test/rate-limit.e2e.test.ts` | 3 teste: ghicirea token-ului comisiei e oprită cu 429, rutele publice nu sunt afectate, `/health`. |
-| `test/cli.e2e.test.ts` | 1 test: CLI-urile reale rulate ca procese separate (keygen cu și fără parolă, status, decrypt refuzat înainte de închidere și fără parolă, decrypt reușit, verificarea online și offline, codul de ieșire la un hash publicat greșit). |
+| `test/cli.e2e.test.ts` | 1 test: CLI-urile reale rulate ca procese separate (keygen cu și fără parolă, status, decrypt refuzat înainte de închidere și fără parolă, decrypt reușit, verificarea online și offline, pe unul și pe două fire, un fișier Benaloh incomplet cu codul 2, codul de ieșire la un hash publicat greșit). |
+| `test/pg-options.test.ts` | 3 teste fără bază de date: SSL-ul conexiunii (`sslmode`, `DATABASE_SSL`, `DATABASE_CA`). |
 
 ## `apps/web/`: site-ul
 
@@ -449,13 +461,17 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 | `src/pages/About.tsx` | Explicația pentru public, cu formule. |
 | `src/pages/commission/CommissionList.tsx` | Tabelul scrutinelor pentru comisie; cine e autentificat și cu ce rol. |
 | `src/pages/commission/CommissionNew.tsx`, `CommissionEdit.tsx` | Crearea unui scrutin și modificarea lui în configurare. |
-| `src/pages/commission/ElectionForm.tsx` | Formularul comun: titlu, interval, candidați (cu reordonare), votul alb, trustees (doar la creare). |
+| `src/pages/commission/ElectionForm.tsx` | Formularul comun: titlu, interval, candidați (cu reordonare), votul alb, „doar NFC”, trustees (doar la creare). |
+| `src/pages/election/ProcesVerbal.tsx` | Procesul-verbal de tipărit: date generale, participare, rezultat, hash-ul board-ului, verificarea rulată din pagină, semnăturile; stilurile de tipărire în `styles/print.css`. |
 | `src/pages/commission/CommissionElection.tsx` | Pagina unui scrutin pentru comisie: starea, ceasul, modifică/șterge (în configurare), deschide/închide, trustees, opțiunile; restul în `parts/`. Observatorii văd tot, fără butoane. |
 | `src/pages/commission/CommissionMembers.tsx` | Membrii comisiei: creare (token afișat o dată), listă, revocare. |
 | `src/pages/commission/parts/` | `Steps` (etapele), `TrusteeTokens` (comenzile afișate o dată), `EligibleImport` (CSV-ul, și cu votul deschis), `BoardHead` (hash-ul de publicat independent), `AuditLog` (jurnalul, cu închiderea automată marcată), `MockToolsPanel` (uneltele de test, doar în mod simulat). |
 | `src/pages/election/ElectionPublic.tsx` | Pagina publică: statisticile, ceasul și cele cinci tab-uri. |
-| `src/pages/election/tabs/` | `BoardTab` (căutarea codului verifică local hash-urile; board-ul pe pagini de câte 50), `ResultTab` (votul alb separat), `VerificationTab` (verificatorul cu bară de progres și raport), `BenalohTab` (auditul unui buletin), `ParametersTab`. |
+| `src/pages/election/tabs/` | `BoardTab` (căutarea codului verifică local hash-urile; board-ul pe pagini de câte 50), `ResultTab` (votul alb separat), `VerificationTab` (verificatorul cu bară de progres și raport), `BenalohTab` (auditul unui buletin), `ParametersTab` (și felul înregistrării: OCR și NFC sau doar NFC). |
+| `vitest.config.ts`, `tsconfig.test.json`, `test/` | Cele 11 teste automate ale site-ului (Vitest, jsdom, Testing Library), pe backend-ul simulat: paginile publice și panoul comisiei. |
 | `src/lib/format.ts`, `src/lib/useAsync.ts` | Formatările (re-exportate din `@evoting/api`) și încărcarea asincronă a datelor în pagini. |
+| `src/lib/verify-workers.ts`, `src/lib/verify.worker.ts` | Verificarea publică în paralel, pe Web Workers (câte unul pe nucleu, cel mult 16). |
+| `src/lib/trusteeTokens.ts` | Token-urile trustees păstrate în `sessionStorage` până când comisia confirmă că le-a transmis; fișierul `.txt` cu comenzile. |
 | `src/styles/` | CSS-ul pe module, importate în ordine de `index.css`: `tokens` (culorile), `base`, `layout`, `cards`, `forms`, `feedback`, `tables`, `results`, `verification`, `responsive`. |
 | `Dockerfile`, `nginx.conf` | Imaginea Docker: build-ul cu Vite, servit apoi de nginx. |
 
@@ -479,7 +495,7 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 | `src/app/_layout.tsx` | Navigarea: lista ecranelor și titlurile lor. |
 | `src/app/index.tsx` | Lista scrutinelor, cu etichetele „Înregistrat” și „Ai votat”. |
 | `src/app/scrutin/[id]/index.tsx` | Pagina unui scrutin: pașii alegătorului, acțiunea principală, candidații sau rezultatul. |
-| `src/app/scrutin/[id]/inregistrare.tsx` | Alegerea între scanare și NFC, plus explicația re-înregistrării (alt telefon, înainte de vot). |
+| `src/app/scrutin/[id]/inregistrare.tsx` | Alegerea între scanare și NFC (la un scrutin „doar NFC”, doar NFC, cu explicația de ce), plus explicația re-înregistrării (alt telefon, înainte de vot). |
 | `src/app/scrutin/[id]/ocr.tsx` | Trei moduri: Cameră (fotografie, OCR nativ, parsare MRZ), Text MRZ (introdus de mână sau „buletin de test”) și Doar CNP; apoi generează credentialul și se înregistrează. |
 | `src/app/scrutin/[id]/nfc.tsx` | CAN-ul (6 cifre), apoi „Citește cipul” (modulul nativ) sau „Simulează citirea cipului” (fără modul nativ, în mod simulat). Trimite DG1 și SOD la server. |
 | `src/app/scrutin/[id]/vot.tsx` | Alegerea candidatului, criptarea pe telefon, confirmarea, auditul Benaloh (recriptare după audit), trimiterea. |
@@ -516,7 +532,7 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 
 **`tools/verifier/`** (`evoting-verify`): `src/cli.ts` și `src/output.ts`, plus:
 
-- **`commands/verify.ts`:** descarcă de pe server sau citește dintr-un fișier salvat, poate primi hash-ul publicat independent prin `--head`, afișează pașii cu ✓/✗ și timpii, iar codul de ieșire e 0 doar dacă trece tot;
+- **`commands/verify.ts`:** descarcă de pe server sau citește dintr-un fișier salvat, poate primi hash-ul publicat independent prin `--head`, verifică pe toate nucleele (`--workers N`, implicit cel mult un fir la 16 buletine), afișează pașii cu ✓/✗, timpii și numărul de fire, iar codul de ieșire e 0 doar dacă trece tot;
 - **`commands/audit-ballot.ts`:** auditul Benaloh dintr-un fișier.
 
 **`tools/simulator/`** (`evoting-simulate`): `src/cli.ts` rulează cele opt etape (scrutin, chei, import, alegători în paralel, închidere, decriptări, comparația rezultatului, verificarea publică) și afișează metricile. Ajutoarele sunt în `src/lib/`: `metrics.ts` (medie, mediană, p95, `timed`), `pool.ts` (paralelism limitat), `synthetic.ts` (CNP-uri reproductibile, opțiuni cu distribuție neuniformă, cipuri NFC de test), `output.ts`.

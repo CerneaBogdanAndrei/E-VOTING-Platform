@@ -67,7 +67,7 @@ describe('backend: scrutin complet pe PostgreSQL', { skip: !available }, () => {
     await assert.rejects(s.api.submitTrusteeKey(election.id, t1.token, { ...k1.publicKey, proof: k2.publicKey.proof }), rejects(400, /Schnorr/))
     await s.api.submitTrusteeKey(election.id, t1.token, k1.publicKey)
     await assert.rejects(s.api.submitTrusteeKey(election.id, t1.token, k1.publicKey), rejects(409))
-    await assert.rejects(s.api.openElection(election.id), rejects(409, /cheile/))
+    await assert.rejects(s.api.openElection(election.id), rejects(409, /Lipse(ște cheia|sc cheile)/))
     election = await s.api.submitTrusteeKey(election.id, t2.token, k2.publicKey)
     keys.push(k1.keyPair, k2.keyPair)
     assert.ok(election.publicKey)

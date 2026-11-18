@@ -1,28 +1,44 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { StyleSheet, Text, View } from 'react-native'
-import { Card, H1, P, Screen, Tag } from '../../../components/ui'
+import { api } from '../../../api'
+import { Card, H1, Notice, P, Screen, Tag } from '../../../components/ui'
 import { colors } from '../../../lib/theme'
+import { useAsync } from '../../../lib/useAsync'
 
 export default function RegistrationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  // un scrutin „doar NFC” nu acceptă scanarea optică (serverul ar refuza-o oricum)
+  const election = useAsync(() => api.getElection(id), [id])
+  const nfcOnly = election.data?.requireNfc === true
 
   return (
     <Screen>
       <View style={{ gap: 4 }}>
         <H1>Confirmă-ți identitatea</H1>
-        <P muted>O singură dată per scrutin. Alege cum vrei să citim datele de pe buletin.</P>
+        <P muted>
+          {nfcOnly
+            ? 'O singură dată per scrutin. La acest scrutin, comisia acceptă doar cartea electronică de identitate (CEI), citită prin NFC.'
+            : 'O singură dată per scrutin. Alege cum vrei să citim datele de pe buletin.'}
+        </P>
       </View>
 
-      <Card onPress={() => router.push({ pathname: '/scrutin/[id]/ocr', params: { id } })}>
-        <View style={styles.head}>
-          <Text style={styles.icon}>▭</Text>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={styles.title}>Scanează buletinul</Text>
-            <Text style={styles.text}>Merge cu orice carte de identitate. Camera citește zona MRZ, rândurile cu „&lt;&lt;&lt;” de jos.</Text>
+      {nfcOnly ? (
+        <Notice
+          tone="accent"
+          text="Scanarea optică nu e permisă la acest scrutin: un MRZ citit cu camera poate fi și printat, pe când datele de pe cip sunt semnate de stat. Ai nevoie de o carte electronică și de un telefon cu NFC."
+        />
+      ) : (
+        <Card onPress={() => router.push({ pathname: '/scrutin/[id]/ocr', params: { id } })}>
+          <View style={styles.head}>
+            <Text style={styles.icon}>▭</Text>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.title}>Scanează buletinul</Text>
+              <Text style={styles.text}>Merge cu orice carte de identitate. Camera citește zona MRZ, rândurile cu „&lt;&lt;&lt;” de jos.</Text>
+            </View>
           </View>
-        </View>
-        <Tag label="Verificat optic" />
-      </Card>
+          <Tag label="Verificat optic" />
+        </Card>
+      )}
 
       <Card onPress={() => router.push({ pathname: '/scrutin/[id]/nfc', params: { id } })}>
         <View style={styles.head}>

@@ -4,6 +4,7 @@
 import { generateCredential } from '@evoting/crypto'
 import { ApiError, type ApiClient, type Election } from '../contract/index.js'
 import { isValidCnp } from '../identity/cnp.js'
+import { bytesToBase64, dg1FromMrz } from '../identity/dg1.js'
 import { buildTd1, buildTd2 } from '../identity/mrz-build.js'
 import { authenticate, prepareBallot } from '../voter.js'
 import type { Run } from './client.js'
@@ -63,7 +64,18 @@ export function createMockTools(ctx: MockContext, client: ApiClient, run: Run): 
           if (s.registeredHmacs.has(ctx.hmac(cnp))) continue
           // același drum ca aplicația: înregistrare, autentificare, criptare, trimitere
           const cred = generateCredential()
-          await client.registerOcr(id, { cnp, credentialPubkey: cred.publicKey })
+          if (s.data.requireNfc) {
+            // scrutin „doar NFC”: un cip de test cu MRZ-ul CEI (simulatorul nu verifică SOD-ul, ca serverul real)
+            const mrz = buildTd1({
+              surname: 'Test',
+              givenNames: 'Alegator',
+              documentNumber: `SIM${done}`,
+              cnp,
+              sex: cnp[0] === '2' || cnp[0] === '6' ? 'F' : 'M',
+              expiry: '351231',
+            })
+            await client.registerNfc(id, { dg1: bytesToBase64(dg1FromMrz(mrz)), sod: '', credentialPubkey: cred.publicKey })
+          } else await client.registerOcr(id, { cnp, credentialPubkey: cred.publicKey })
           const election = ctx.snapshot(s)
           const { ballot } = prepareBallot(
             election,

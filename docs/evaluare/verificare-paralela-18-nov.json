@@ -1,0 +1,199 @@
+{
+  "date": "2026-11-18",
+  "what": "evoting-verify --bundle <1000 de buletine> --json --workers N, mediana a trei rulări",
+  "ballots": 1000,
+  "candidates": 3,
+  "trustees": 3,
+  "machine": "Intel Core i7-10700F (8 nuclee fizice, 16 logice), Windows 11, Node 24.19",
+  "allReportsIdentical": true,
+  "node": [
+    {
+      "threads": 1,
+      "runs": 3,
+      "totalMs": 30190,
+      "credentialsMs": 1965,
+      "proofsMs": 27257,
+      "aggregateMs": 869,
+      "speedup": 1.0
+    },
+    {
+      "threads": 2,
+      "runs": 3,
+      "totalMs": 18742,
+      "credentialsMs": 1234,
+      "proofsMs": 16822,
+      "aggregateMs": 597,
+      "speedup": 1.61
+    },
+    {
+      "threads": 4,
+      "runs": 3,
+      "totalMs": 10481,
+      "credentialsMs": 794,
+      "proofsMs": 9190,
+      "aggregateMs": 334,
+      "speedup": 2.88
+    },
+    {
+      "threads": 8,
+      "runs": 3,
+      "totalMs": 6607,
+      "credentialsMs": 743,
+      "proofsMs": 5522,
+      "aggregateMs": 209,
+      "speedup": 4.57
+    },
+    {
+      "threads": 16,
+      "runs": 3,
+      "totalMs": 6119,
+      "credentialsMs": 717,
+      "proofsMs": 4880,
+      "aggregateMs": 238,
+      "speedup": 4.93
+    }
+  ],
+  "browser": {
+    "where": "Chrome, tab-ul „Verificare publică”, server de dezvoltare Vite, descărcarea pachetului inclusă",
+    "oneThreadS": 16.1,
+    "sixteenWebWorkersS": 6.1
+  },
+  "simulator": "evoting-simulate --voters 1000: 30,4 s pe un fir, 6,6 s pe 16 fire, raport identic, rezultat = voturile simulate",
+  "raw": [
+    {
+      "rep": 1,
+      "ok": true,
+      "threads": 1,
+      "totalMs": 28414,
+      "credentials": 1965,
+      "proofs": 25442,
+      "aggregate": 828
+    },
+    {
+      "rep": 1,
+      "ok": true,
+      "threads": 2,
+      "totalMs": 18678,
+      "credentials": 1265,
+      "proofs": 16635,
+      "aggregate": 597
+    },
+    {
+      "rep": 1,
+      "ok": true,
+      "threads": 4,
+      "totalMs": 10481,
+      "credentials": 789,
+      "proofs": 9190,
+      "aggregate": 327
+    },
+    {
+      "rep": 1,
+      "ok": true,
+      "threads": 8,
+      "totalMs": 6711,
+      "credentials": 776,
+      "proofs": 5522,
+      "aggregate": 233
+    },
+    {
+      "rep": 1,
+      "ok": true,
+      "threads": 16,
+      "totalMs": 6119,
+      "credentials": 724,
+      "proofs": 4976,
+      "aggregate": 225
+    },
+    {
+      "rep": 2,
+      "ok": true,
+      "threads": 1,
+      "totalMs": 30190,
+      "credentials": 1903,
+      "proofs": 27257,
+      "aggregate": 869
+    },
+    {
+      "rep": 2,
+      "ok": true,
+      "threads": 2,
+      "totalMs": 18742,
+      "credentials": 1151,
+      "proofs": 16833,
+      "aggregate": 572
+    },
+    {
+      "rep": 2,
+      "ok": true,
+      "threads": 4,
+      "totalMs": 10472,
+      "credentials": 794,
+      "proofs": 9159,
+      "aggregate": 334
+    },
+    {
+      "rep": 2,
+      "ok": true,
+      "threads": 8,
+      "totalMs": 6607,
+      "credentials": 661,
+      "proofs": 5565,
+      "aggregate": 209
+    },
+    {
+      "rep": 2,
+      "ok": true,
+      "threads": 16,
+      "totalMs": 6131,
+      "credentials": 717,
+      "proofs": 4880,
+      "aggregate": 265
+    },
+    {
+      "rep": 3,
+      "ok": true,
+      "threads": 1,
+      "totalMs": 30822,
+      "credentials": 2040,
+      "proofs": 27459,
+      "aggregate": 1120
+    },
+    {
+      "rep": 3,
+      "ok": true,
+      "threads": 2,
+      "totalMs": 18873,
+      "credentials": 1234,
+      "proofs": 16822,
+      "aggregate": 614
+    },
+    {
+      "rep": 3,
+      "ok": true,
+      "threads": 4,
+      "totalMs": 10894,
+      "credentials": 816,
+      "proofs": 9544,
+      "aggregate": 351
+    },
+    {
+      "rep": 3,
+      "ok": true,
+      "threads": 8,
+      "totalMs": 6520,
+      "credentials": 743,
+      "proofs": 5380,
+      "aggregate": 202
+    },
+    {
+      "rep": 3,
+      "ok": true,
+      "threads": 16,
+      "totalMs": 5391,
+      "credentials": 639,
+      "proofs": 4339,
+      "aggregate": 238
+    }
+  ]
+}

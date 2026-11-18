@@ -41,6 +41,8 @@ export interface Election {
   closesAt: string
   /** Y = ΣYᵢ, hex. null până când toți trustees și-au trimis cheia. */
   publicKey: string | null
+  /** Înregistrarea se face doar cu cartea electronică (NFC, verificare criptografică); scanarea optică e refuzată. */
+  requireNfc: boolean
   candidates: Candidate[]
   trustees: Trustee[]
   stats: ElectionStats
@@ -54,10 +56,12 @@ export interface CreateElectionInput {
   trustees: { name: string }[]
   /** Adaugă opțiunea „vot alb” la sfârșitul listei. */
   allowBlank?: boolean
+  /** Doar înregistrarea prin NFC (cartea electronică); OCR-ul e refuzat. Implicit, ambele. */
+  requireNfc?: boolean
 }
 
 /** Ce se poate schimba cât timp scrutinul e în configurare (trustees nu: au token-uri deja emise). */
-export type UpdateElectionInput = Partial<Pick<CreateElectionInput, 'title' | 'opensAt' | 'closesAt' | 'candidates' | 'allowBlank'>>
+export type UpdateElectionInput = Partial<Pick<CreateElectionInput, 'title' | 'opensAt' | 'closesAt' | 'candidates' | 'allowBlank' | 'requireNfc'>>
 
 /** Token-ul unui trustee se afișează o singură dată, la crearea scrutinului; serverul păstrează doar hash-ul lui. */
 export interface TrusteeToken {
@@ -74,5 +78,18 @@ export interface CreatedElection {
 export interface EligibleImportResult {
   imported: number
   duplicates: number
+  invalid: { line: number; value: string }[]
+}
+
+/** Rezultatul scoaterii unor CNP-uri din lista de eligibili (de exemplu, o persoană adăugată din greșeală). */
+export interface EligibleRemoveResult {
+  /** Câte CNP-uri au fost scoase din listă. */
+  removed: number
+  /** Câte dintre ele aveau deja un credential înregistrat: înregistrarea e ștearsă și ea, deci persoana nu mai poate vota. */
+  registrationsRemoved: number
+  /** CNP-uri valide care nu erau în listă. */
+  notFound: number
+  /** CNP-uri păstrate pentru că persoana a votat deja: un vot de pe board nu se mai scoate. */
+  voted: number
   invalid: { line: number; value: string }[]
 }

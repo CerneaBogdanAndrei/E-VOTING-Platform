@@ -2,10 +2,11 @@
 // credentiale înregistrate, board-ul, agregatul, decriptările parțiale și
 // rezultatul) și reface fiecare pas. Orice pas picat spune exact unde.
 
-import { ballotHash, verifyBallotProofs, verifyBallotSignature } from './ballot.js'
+import { ballotHash } from './ballot.js'
 import { computeEntryHash, entryToBallot, genesisHash } from './board.js'
+import { sequentialWork, type BallotWork } from './parallel.js'
 import { combinePublicKeys, verifyPartialDecryption, verifyTrusteeKey } from './trustee.js'
-import { combinePartialDecryptions, computeAggregate } from './tally.js'
+import { combinePartialDecryptions } from './tally.js'
 import type { BoardEntry, Ciphertext, ChaumPedersenProof, ElectionParams, PartialDecryption } from './types.js'
 
 export interface AuditBundle {
@@ -56,6 +57,11 @@ export interface VerifyOptions {
   onProgress?: (step: StepId, done: number, total: number) => void
   /** Cedează controlul la fiecare N buletine, ca interfața să rămână receptivă în browser. */
   yieldEvery?: number
+  /**
+   * Cine verifică semnăturile și dovezile ZK (partea scumpă). Implicit, firul curent;
+   * cu `createNodeWork` (din `@evoting/crypto/node`) sau cu Web Workers, în paralel. Raportul e același.
+   */
+  work?: BallotWork
 }
 
 export const STEP_TITLES: Record<StepId, string> = {
@@ -68,6 +74,7 @@ export const STEP_TITLES: Record<StepId, string> = {
 }
 
 const MAX_LISTED_FAILURES = 50
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err))
 // Disponibil în Node, browser și React Native; declarat aici ca biblioteca să nu depindă de tipurile DOM.
 declare function setTimeout(callback: () => void, ms: number): unknown
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
@@ -75,6 +82,7 @@ const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 export async function verifyElection(bundle: AuditBundle, options: VerifyOptions = {}): Promise<VerificationReport> {
   const { election, board } = bundle
   const yieldEvery = options.yieldEvery ?? 0
+  const work = options.work ?? sequentialWork()
   const steps: VerificationStep[] = []
   const step = (id: StepId): VerificationStep => {
     const s: VerificationStep = { id, title: STEP_TITLES[id], status: 'ok', details: [], failures: [] }
@@ -89,12 +97,17 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
     options.onProgress?.(id, done, total)
     if (yieldEvery > 0 && done % yieldEvery === 0) await tick()
   }
+  /** Începutul unui pas (0 din total): cine măsoară timpii știe exact când pornește fiecare pas, și în paralel. */
+  const begin = (s: VerificationStep, total: number) => {
+    options.onProgress?.(s.id, 0, total)
+    return s
+  }
 
   const candidates = [...election.candidates].sort((a, b) => a.position - b.position)
   const n = candidates.length
 
   // 0. Cheile
-  const keys = step('keys')
+  const keys = begin(step('keys'), election.trustees.length)
   for (const t of election.trustees) {
     if (!t.publicKeyShare || !t.keyProof) {
       fail(keys, `trustee-ul ${t.name ?? t.id}`, 'Lipsește cheia publică sau dovada Schnorr')
@@ -110,61 +123,67 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
   const params: ElectionParams | null = election.publicKey ? { electionId: election.id, publicKey: election.publicKey, candidateCount: n } : null
 
   // 1. Lanțul (și timpii: ordonați, în intervalul scrutinului)
-  const chain = step('chain')
+  const chain = begin(step('chain'), board.length)
   let prev = genesisHash(election.id)
   let prevTime = -Infinity
   const opens = election.opensAt ? Date.parse(election.opensAt) : null
   const closes = election.closesAt ? Date.parse(election.closesAt) : null
   for (let k = 0; k < board.length; k++) {
     const e = board[k]
-    const where = `buletinul #${e.seq}`
-    if (e.seq !== k + 1) fail(chain, where, `Poziție așteptată ${k + 1}, găsită ${e.seq} (ordinea a fost schimbată sau lipsesc intrări)`)
-    if (e.prevHash !== prev) fail(chain, where, 'Hash-ul anterior nu corespunde intrării dinainte')
-    const t = Date.parse(e.receivedAt)
-    if (Number.isNaN(t)) fail(chain, where, 'Data primirii nu e validă')
-    else {
-      if (t < prevTime) fail(chain, where, 'Data primirii e mai veche decât a intrării anterioare: ordinea în timp e încălcată')
-      if (opens !== null && t < opens) fail(chain, where, 'Buletin primit înainte de deschiderea votului')
-      if (closes !== null && t > closes) fail(chain, where, 'Buletin primit după închiderea votului')
-      prevTime = t
+    const where = `buletinul #${e?.seq ?? k + 1}`
+    try {
+      if (e.seq !== k + 1) fail(chain, where, `Poziție așteptată ${k + 1}, găsită ${e.seq} (ordinea a fost schimbată sau lipsesc intrări)`)
+      if (e.prevHash !== prev) fail(chain, where, 'Hash-ul anterior nu corespunde intrării dinainte')
+      const t = Date.parse(e.receivedAt)
+      if (Number.isNaN(t)) fail(chain, where, 'Data primirii nu e validă')
+      else {
+        if (t < prevTime) fail(chain, where, 'Data primirii e mai veche decât a intrării anterioare: ordinea în timp e încălcată')
+        if (opens !== null && t < opens) fail(chain, where, 'Buletin primit înainte de deschiderea votului')
+        if (closes !== null && t > closes) fail(chain, where, 'Buletin primit după închiderea votului')
+        prevTime = t
+      }
+      const bh = ballotHash(entryToBallot(election.id, e))
+      if (bh !== e.ballotHash) {
+        fail(
+          chain,
+          where,
+          `Conținutul a fost modificat: hash-ul recalculat al buletinului (${bh.slice(0, 8)}…) ≠ cel publicat (${String(e.ballotHash).slice(0, 8)}…)`,
+        )
+      }
+      const h = computeEntryHash({ electionId: election.id, seq: e.seq, prevHash: e.prevHash, ballotHash: bh, receivedAt: e.receivedAt })
+      if (h !== e.hash) fail(chain, where, `Hash-ul intrării recalculat (${h.slice(0, 8)}…) ≠ codul de urmărire publicat (${String(e.hash).slice(0, 8)}…)`)
+    } catch (err) {
+      // date care nici nu au forma unei intrări: se raportează, nu opresc verificarea
+      fail(chain, where, `Intrare malformată: ${errorText(err)}`)
     }
-    const bh = ballotHash(entryToBallot(election.id, e))
-    if (bh !== e.ballotHash) {
-      fail(
-        chain,
-        where,
-        `Conținutul a fost modificat: hash-ul recalculat al buletinului (${bh.slice(0, 8)}…) ≠ cel publicat (${String(e.ballotHash).slice(0, 8)}…)`,
-      )
-    }
-    const h = computeEntryHash({ electionId: election.id, seq: e.seq, prevHash: e.prevHash, ballotHash: bh, receivedAt: e.receivedAt })
-    if (h !== e.hash) fail(chain, where, `Hash-ul intrării recalculat (${h.slice(0, 8)}…) ≠ codul de urmărire publicat (${e.hash.slice(0, 8)}…)`)
-    prev = e.hash
+    prev = e?.hash
     await progress('chain', k + 1, board.length)
   }
-  const head = board.length ? board[board.length - 1].hash : genesisHash(election.id)
+  const head = board.length ? String(board[board.length - 1]?.hash) : genesisHash(election.id)
   if (options.publishedHead) {
     const { seq, hash } = options.publishedHead
     const entry = seq === 0 ? { hash: genesisHash(election.id) } : board[seq - 1]
     if (!entry) fail(chain, `intrarea #${seq}`, 'Hash-ul publicat independent se referă la o intrare care nu mai există pe board')
-    else if (entry.hash !== hash.toLowerCase()) fail(chain, `intrarea #${seq}`, 'Board-ul diferă de hash-ul publicat independent: istoria a fost rescrisă')
+    else if (entry?.hash !== hash.toLowerCase()) fail(chain, `intrarea #${seq}`, 'Board-ul diferă de hash-ul publicat independent: istoria a fost rescrisă')
     else chain.details.push(`Intrarea #${seq} corespunde hash-ului publicat independent`)
   }
   if (chain.status === 'ok') chain.details.push(`${board.length} intrări legate corect; ultimul hash ${head.slice(0, 16)}…`)
 
   // 2. Semnături și credentiale
-  const creds = step('credentials')
+  const creds = begin(step('credentials'), board.length)
   const registered = new Set(bundle.registrations.map((r) => r.credentialPubkey))
   if (registered.size !== bundle.registrations.length) fail(creds, 'lista de înregistrări', 'Același credential apare de mai multe ori')
   const seen = new Map<string, number>()
+  const signatures = await work.signatures(election.id, board, (done) => progress('credentials', done, board.length))
   for (let k = 0; k < board.length; k++) {
     const e = board[k]
-    const where = `buletinul #${e.seq}`
-    if (!registered.has(e.credentialPubkey)) fail(creds, where, 'Credentialul nu figurează în lista publică de înregistrări')
-    const first = seen.get(e.credentialPubkey)
+    const where = `buletinul #${e?.seq ?? k + 1}`
+    const credential = e?.credentialPubkey
+    if (!registered.has(credential)) fail(creds, where, 'Credentialul nu figurează în lista publică de înregistrări')
+    const first = seen.get(credential)
     if (first !== undefined) fail(creds, where, `Credentialul a mai votat la buletinul #${first}`)
-    else seen.set(e.credentialPubkey, e.seq)
-    if (!verifyBallotSignature(entryToBallot(election.id, e))) fail(creds, where, 'Semnătura credentialului nu e validă')
-    await progress('credentials', k + 1, board.length)
+    else seen.set(credential, e?.seq ?? k + 1)
+    if (!signatures[k]) fail(creds, where, 'Semnătura credentialului nu e validă')
   }
   if (creds.status === 'ok') {
     creds.details.push(`${board.length} semnături valide, fiecare credential votează o singură dată`)
@@ -172,31 +191,26 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
   }
 
   // 3. Dovezile ZK
-  const proofs = step('proofs')
+  const proofs = begin(step('proofs'), board.length)
   if (!params) {
     proofs.status = 'skipped'
     proofs.details.push('Cheia scrutinului lipsește')
   } else {
-    for (let k = 0; k < board.length; k++) {
-      const e = board[k]
-      const check = verifyBallotProofs(params, entryToBallot(election.id, e))
-      if (!check.ok)
-        fail(
-          proofs,
-          `buletinul #${e.seq}${check.candidate !== undefined ? `, ${candidates[check.candidate]?.name ?? `poziția ${check.candidate + 1}`}` : ''}`,
-          check.reason,
-        )
-      await progress('proofs', k + 1, board.length)
-    }
+    const checks = await work.proofs(params, board, (done) => progress('proofs', done, board.length))
+    checks.forEach((check, k) => {
+      if (check.ok) return
+      const where = `buletinul #${board[k]?.seq ?? k + 1}`
+      fail(proofs, `${where}${check.candidate !== undefined ? `, ${candidates[check.candidate]?.name ?? `poziția ${check.candidate + 1}`}` : ''}`, check.reason)
+    })
     if (proofs.status === 'ok') proofs.details.push(`${board.length} buletine × ${n} dovezi 0/1 + dovada sumei: toate valide`)
   }
 
   // 4. Agregatul
-  const aggregateStep = step('aggregate')
+  const aggregateStep = begin(step('aggregate'), board.length)
   const published = bundle.tally?.aggregate ?? null
   let recomputed: Ciphertext[] | null = null
   try {
-    recomputed = computeAggregate(n, board)
+    recomputed = await work.aggregate(n, board, (done) => progress('aggregate', done, board.length))
   } catch (err) {
     fail(aggregateStep, 'board', err instanceof Error ? err.message : String(err))
   }
@@ -215,7 +229,7 @@ export async function verifyElection(bundle: AuditBundle, options: VerifyOptions
   }
 
   // 5. Decriptarea și rezultatul
-  const dec = step('decryption')
+  const dec = begin(step('decryption'), election.trustees.length)
   const result = bundle.result
   if (!published || !bundle.tally || !result) {
     dec.status = 'skipped'

@@ -2,7 +2,8 @@ import { createHttpClient, createMockBackend, type ApiClient, type MockTools } f
 import { getAdminToken } from './admin'
 import { API_URL } from './config'
 
-const mock = API_URL ? null : createMockBackend()
+// în testele automate (Vitest, modul „test”) backend-ul simulat răspunde fără latența artificială
+const mock = API_URL ? null : createMockBackend({ latency: import.meta.env.MODE !== 'test' })
 
 export const api: ApiClient = mock ? mock.client : createHttpClient(API_URL!, { getAdminToken })
 

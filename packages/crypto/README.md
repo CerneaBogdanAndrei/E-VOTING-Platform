@@ -18,10 +18,12 @@ Teoria și formulele: [docs/DOCUMENTATIE.md §5](../../docs/DOCUMENTATIE.md#5-ce
 | `src/ballot.ts` | `encryptBallot`, `verifyBallot`, `auditBallot` (provocarea Benaloh), hash-urile buletinului. |
 | `src/board.ts` | Bulletin board-ul: hash-ul genesis, hash-ul intrării, `appendEntry`, `checkOwnEntry` (verificarea propriului vot). |
 | `src/trustee.ts` | `generateTrusteeKey`, `combinePublicKeys` (Y = ΣYᵢ), `partialDecrypt`, `verifyPartialDecryption`. |
-| `src/tally.ts` | `computeAggregate`, `babyStepGiantStep`, `combinePartialDecryptions`. |
-| `src/verify.ts` | `verifyElection`: verificatorul public, cu cei șase pași (inclusiv orele primirii: crescătoare și în intervalul scrutinului) și locul exact al fiecărei erori. |
+| `src/tally.ts` | `computeAggregate` (și pe o bucată din board), `sumAggregates`, `babyStepGiantStep`, `combinePartialDecryptions`. |
+| `src/verify.ts` | `verifyElection`: verificatorul public, cu cei șase pași (inclusiv orele primirii: crescătoare și în intervalul scrutinului) și locul exact al fiecărei erori; partea scumpă o face un `BallotWork` (opțiunea `work`). |
+| `src/parallel.ts` | Verificarea în paralel, fără nimic specific platformei: `sequentialWork` (implicit), `createParallelWork` (bazinul de lucrători, bucăți, ordinea rezultatelor), `handleWorkRequest` (ce face un fir). |
+| `src/node/` | `@evoting/crypto/node`: `createNodeWork` (bazin de `worker_threads`), `defaultThreads`; compilat separat (`tsconfig.node.json`), ca restul să nu depindă de Node. |
 | `src/index.ts` | Exporturile publice. |
 
 ## Teste
 
-`npm test -w @evoting/crypto` rulează 45 de teste, câte un fișier pe temă: `encoding`, `elgamal`, `ballot`, `trustee`, `verifier`. `test/helpers.ts` are `simulateElection` (un scrutin complet fără server) și `forgeBallot` (buletine trișate).
+`npm test -w @evoting/crypto` rulează 54 de teste, câte un fișier pe temă: `encoding`, `elgamal`, `ballot`, `trustee`, `verifier`, `parallel` (verificarea pe `worker_threads` reale, intrările malformate, auditul Benaloh incomplet, cheile de ordin mic). `test/helpers.ts` are `simulateElection` (un scrutin complet fără server) și `forgeBallot` (buletine trișate).

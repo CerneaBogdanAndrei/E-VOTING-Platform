@@ -19,12 +19,14 @@ import {
 import {
   ApiError,
   type EligibleImportResult,
+  type EligibleRemoveResult,
   type Registration,
   type RegistrationMethod,
   type TrustLevel,
   type UpdateElectionInput,
 } from '../contract/index.js'
-import { isValidCnp } from '../identity/cnp.js'
+import { plural } from '../format.js'
+import { isValidCnp, parseCnpList } from '../identity/cnp.js'
 import { electionParams, prepareBallot } from '../voter.js'
 import { pickWeighted } from './random.js'
 import { buildCandidates, type ElectionState, type MockContext } from './state.js'
@@ -54,7 +56,8 @@ export function updateElection(ctx: MockContext, s: ElectionState, input: Update
   s.data.title = title
   s.data.opensAt = opensAt
   s.data.closesAt = closesAt
-  ctx.log(s, 'comisie', 'election.update', { title, candidates: s.data.candidates.length })
+  if (input.requireNfc !== undefined) s.data.requireNfc = input.requireNfc === true
+  ctx.log(s, 'comisie', 'election.update', { title, candidates: s.data.candidates.length, requireNfc: s.data.requireNfc })
 }
 
 export function deleteElection(ctx: MockContext, s: ElectionState) {
@@ -65,7 +68,7 @@ export function deleteElection(ctx: MockContext, s: ElectionState) {
 export function openElection(ctx: MockContext, s: ElectionState, now = Date.now()) {
   if (s.data.status !== 'draft') throw new ApiError(409, 'Scrutinul nu este în configurare')
   const missing = s.data.trustees.filter((t) => !t.publicKeyShare).length
-  if (missing > 0) throw new ApiError(409, `Lipsesc cheile de la ${missing} trustee(s)`)
+  if (missing > 0) throw new ApiError(409, missing === 1 ? 'Lipsește cheia unui trustee' : `Lipsesc cheile de la ${plural(missing, 'trustee', 'trustees')}`)
   if (s.eligible.size === 0) throw new ApiError(409, 'Lista alegătorilor eligibili este goală')
   if (new Date(s.data.closesAt).getTime() <= now) throw new ApiError(409, 'Data închiderii a trecut deja; modifică intervalul scrutinului')
   s.data.status = 'open'
@@ -125,14 +128,9 @@ export function addEligible(ctx: MockContext, s: ElectionState, cnps: string[]) 
 /** CSV cu un CNP pe linie, ca la serverul real: se păstrează HMAC-ul (și, doar aici, CNP-ul pentru uneltele de test). */
 export function importCsv(ctx: MockContext, s: ElectionState, csv: string): EligibleImportResult {
   if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Lista se poate completa doar înainte de închiderea votului')
-  const result: EligibleImportResult = { imported: 0, duplicates: 0, invalid: [] }
-  for (const [i, raw] of csv.split(/\r?\n/).entries()) {
-    const value = raw.split(/[,;]/)[0].trim().replace(/^"|"$/g, '')
-    if (!value || (i === 0 && /^cnp$/i.test(value))) continue
-    if (!isValidCnp(value)) {
-      result.invalid.push({ line: i + 1, value })
-      continue
-    }
+  const { valid, invalid } = parseCnpList(csv)
+  const result: EligibleImportResult = { imported: 0, duplicates: 0, invalid }
+  for (const value of valid) {
     const h = ctx.hmac(value)
     if (s.eligible.has(h)) {
       result.duplicates++
@@ -146,12 +144,41 @@ export function importCsv(ctx: MockContext, s: ElectionState, csv: string): Elig
   return result
 }
 
+/** Scoaterea din listă, ca la serverul real: cine s-a înregistrat și n-a votat își pierde și înregistrarea; cine a votat rămâne. */
+export function removeCsv(ctx: MockContext, s: ElectionState, csv: string): EligibleRemoveResult {
+  if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Lista se poate modifica doar înainte de închiderea votului')
+  const { valid, invalid } = parseCnpList(csv)
+  const result: EligibleRemoveResult = { removed: 0, registrationsRemoved: 0, notFound: 0, voted: 0, invalid }
+  for (const cnp of new Set(valid)) {
+    const h = ctx.hmac(cnp)
+    const credential = s.registeredHmacs.get(h)
+    if (credential && s.board.some((e) => e.credentialPubkey === credential)) {
+      result.voted++
+      continue
+    }
+    if (!s.eligible.delete(h)) {
+      result.notFound++
+      continue
+    }
+    if (credential) {
+      s.registeredHmacs.delete(h)
+      s.registrations.delete(credential)
+      result.registrationsRemoved++
+    }
+    s.testCnps = s.testCnps.filter((x) => x !== cnp)
+    result.removed++
+  }
+  ctx.log(s, 'comisie', 'eligible.remove', { ...result, invalid: invalid.length })
+  return result
+}
+
 /**
  * Înregistrarea. Dacă persoana e deja înregistrată și n-a votat, credentialul vechi se înlocuiește
  * (de exemplu după schimbarea telefonului), dar doar cu același nivel de încredere sau mai mare.
  */
 export function register(ctx: MockContext, s: ElectionState, cnp: string, credentialPubkey: string, method: RegistrationMethod): Registration {
   if (s.data.status !== 'draft' && s.data.status !== 'open') throw new ApiError(409, 'Înregistrarea s-a închis pentru acest scrutin')
+  if (s.data.requireNfc && method !== 'nfc') throw new ApiError(403, 'Acest scrutin acceptă doar înregistrarea cu cartea electronică (NFC)')
   if (!isValidCnp(cnp)) throw new ApiError(400, 'CNP invalid')
   if (!isCredentialPubkey(credentialPubkey)) throw new ApiError(400, 'Cheia de credential nu e o cheie Ed25519 validă')
   const h = ctx.hmac(cnp)
@@ -205,7 +232,7 @@ export function voteRandomly(ctx: MockContext, s: ElectionState, count: number, 
     if (done >= count) break
     if (s.registeredHmacs.has(ctx.hmac(cnp))) continue
     const cred = generateCredential()
-    register(ctx, s, cnp, cred.publicKey, ctx.rand() < 0.35 ? 'nfc' : 'ocr')
+    register(ctx, s, cnp, cred.publicKey, s.data.requireNfc || ctx.rand() < 0.35 ? 'nfc' : 'ocr')
     const { ballot } = prepareBallot(election, cred, pickWeighted(ctx.rand, weights))
     const at = start ? new Date(start.getTime() + (spanMs * (done + 1)) / (count + 1)).toISOString() : undefined
     cast(ctx, s, ballot, at, verify)

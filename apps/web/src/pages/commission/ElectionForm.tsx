@@ -45,6 +45,7 @@ export function ElectionForm({
     initial ? initial.candidates.filter((c) => c.kind === 'candidate').map((c) => row(c.name, c.description)) : [row(), row()],
   )
   const [allowBlank, setAllowBlank] = useState(() => initial?.candidates.some((c) => c.kind === 'blank') ?? false)
+  const [requireNfc, setRequireNfc] = useState(() => initial?.requireNfc ?? false)
   const [trustees, setTrustees] = useState<Row[]>([row('Comisia electorală'), row('Observatori independenți'), row('Reprezentanții candidaților')])
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)
@@ -70,6 +71,7 @@ export function ElectionForm({
         candidates: candidates.filter((c) => c.name.trim()).map((c) => ({ name: c.name.trim(), description: c.description.trim() })),
         trustees: trustees.filter((t) => t.name.trim()).map((t) => ({ name: t.name.trim() })),
         allowBlank,
+        requireNfc,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -145,6 +147,18 @@ export function ElectionForm({
             Permite votul alb (apare ca ultimă opțiune, numărat separat)
           </label>
         </div>
+      </div>
+
+      <div className="card">
+        <h3>Înregistrarea alegătorilor</h3>
+        <label className="check">
+          <input type="checkbox" checked={requireNfc} onChange={(e) => setRequireNfc(e.target.checked)} />
+          Doar cu cartea electronică (NFC): fără scanarea optică a buletinului
+        </label>
+        <p className="hint">
+          Scanarea optică (OCR) merge cu orice carte de identitate, dar acceptă orice MRZ cu cifre de control corecte, inclusiv unul printat. Citirea cipului
+          (NFC) verifică semnătura statului (Passive Authentication), deci nu poate fi falsificată, dar cere o carte electronică (CEI) și un telefon cu NFC.
+        </p>
       </div>
 
       {!editing && (

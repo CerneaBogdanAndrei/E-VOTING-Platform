@@ -17,7 +17,7 @@
   "scripts": {
     "build": "npm run build:packages && npm run build -w @evoting/backend -w @evoting/trustee -w @evoting/verifier -w @evoting/simulator -w @evoting/attacks && npm run build -w @evoting/web",
     "build:packages": "npm run build -w @evoting/crypto -w @evoting/api",
-    "test": "npm run build:packages && npm test -w @evoting/crypto -w @evoting/api && npm run build -w @evoting/trustee -w @evoting/verifier && npm test -w @evoting/backend",
+    "test": "npm run build:packages && npm test -w @evoting/crypto -w @evoting/api && npm run build -w @evoting/trustee -w @evoting/verifier && npm test -w @evoting/backend && npm test -w @evoting/web",
     "lint": "oxlint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -12,21 +12,23 @@ export function BoardTab({ election }: { election: Election }) {
   const [page, setPage] = useState(1)
   const board = useAsync(() => api.getBoardPage(election.id, page, PAGE_SIZE), [election.id, election.stats.ballots, page])
   const [code, setCode] = useState('')
-  const [lookup, setLookup] = useState<{ entry?: BoardEntry; error?: string; busy?: boolean }>({})
+  // codul căutat se păstrează lângă intrarea găsită: verificarea se face față de el, nu față de ce scrie acum în câmp
+  const [lookup, setLookup] = useState<{ entry?: BoardEntry; code?: string; error?: string; busy?: boolean }>({})
 
   const search = async (ev: FormEvent) => {
     ev.preventDefault()
-    if (!code.trim()) return
+    const searched = code.trim()
+    if (!searched) return
     setLookup({ busy: true })
     try {
-      setLookup({ entry: await api.findBallot(election.id, code) })
+      setLookup({ entry: await api.findBallot(election.id, searched), code: searched })
     } catch (err) {
       setLookup({ error: err instanceof Error ? err.message : String(err) })
     }
   }
 
-  // hash-urile intrării găsite se recalculează în browser și se compară cu codul introdus
-  const found = lookup.entry ? { entry: lookup.entry, check: checkOwnEntry(election.id, lookup.entry, { trackingCode: code }) } : null
+  // hash-urile intrării găsite se recalculează în browser și se compară cu codul căutat
+  const found = lookup.entry && lookup.code ? { entry: lookup.entry, check: checkOwnEntry(election.id, lookup.entry, { trackingCode: lookup.code }) } : null
   const pages = board.data ? Math.max(1, Math.ceil(board.data.total / PAGE_SIZE)) : 1
 
   return (

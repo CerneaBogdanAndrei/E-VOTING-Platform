@@ -46,9 +46,14 @@ export function ElectionPublic() {
           <h1>{e.title}</h1>
           <Countdown status={e.status} opensAt={e.opensAt} closesAt={e.closesAt} />
         </div>
-        <button type="button" className="btn" onClick={election.reload}>
-          Reîmprospătează
-        </button>
+        <div className="row gap-s">
+          <Link to={`/scrutin/${e.id}/proces-verbal`} className="btn">
+            Proces-verbal
+          </Link>
+          <button type="button" className="btn" onClick={election.reload}>
+            Reîmprospătează
+          </button>
+        </div>
       </div>
 
       <div className="stats">

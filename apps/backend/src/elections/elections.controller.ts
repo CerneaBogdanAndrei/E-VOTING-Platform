@@ -112,6 +112,14 @@ export class ElectionsController {
     return this.commission.importEligible(id, body, admin)
   }
 
+  /** Scoaterea unor CNP-uri din listă; tot CSV, ca la import. */
+  @Post(':id/eligible/remove')
+  @HttpCode(200)
+  @UseGuards(CommissionGuard)
+  removeEligible(@Param('id') id: string, @Body() body: unknown, @Admin() admin: AdminIdentity) {
+    return this.commission.removeEligible(id, body, admin)
+  }
+
   @Post(':id/open')
   @HttpCode(200)
   @UseGuards(CommissionGuard)

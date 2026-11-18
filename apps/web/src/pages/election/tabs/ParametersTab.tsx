@@ -2,7 +2,7 @@ import type { Election } from '../../../api'
 import { Hash } from '../../../components/ui'
 import { candidateLabel } from '../../../lib/format'
 
-/** Parametrii publici: cheia scrutinului, ordinea opțiunilor și cheile trustees. */
+/** Parametrii publici: cheia scrutinului, ordinea opțiunilor, felul înregistrării și cheile trustees. */
 export function ParametersTab({ election }: { election: Election }) {
   return (
     <section className="section grid-2">
@@ -29,6 +29,12 @@ export function ParametersTab({ election }: { election: Election }) {
             </li>
           ))}
         </ul>
+        <h3 className="mt">Înregistrarea alegătorilor</h3>
+        <p className="hint">
+          {election.requireNfc
+            ? 'Doar cu cartea electronică (NFC): datele de pe cip, semnate de stat, verificate de server (Passive Authentication). Scanarea optică e refuzată.'
+            : 'Cu scanarea optică a buletinului (OCR, nivel „optic”) sau cu citirea cipului cărții electronice (NFC, nivel „criptografic”).'}
+        </p>
       </div>
     </section>
   )

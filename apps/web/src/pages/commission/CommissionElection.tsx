@@ -2,12 +2,13 @@
 // candidații, importul eligibililor, hash-ul de publicat independent și jurnalul.
 // Bucățile mari sunt în ./parts.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api, mockTools, type TrusteeToken } from '../../api'
 import { canEdit, useAdmin } from '../../api/admin'
 import { Countdown, ErrorBox, Hash, Loading, Message, Stat, StatusBadge, type MessageKind } from '../../components/ui'
-import { candidateLabel, formatInterval, percent } from '../../lib/format'
+import { candidateLabel, formatInterval, percent, plural } from '../../lib/format'
+import { forgetTrusteeTokens, loadTrusteeTokens, saveTrusteeTokens } from '../../lib/trusteeTokens'
 import { useAsync } from '../../lib/useAsync'
 import { AuditLog } from './parts/AuditLog'
 import { BoardHead } from './parts/BoardHead'
@@ -25,10 +26,25 @@ export function CommissionElection() {
   const navigate = useNavigate()
   const election = useAsync(() => api.getElection(id), [id])
   const location = useLocation()
-  const trusteeTokens = (location.state as { trusteeTokens?: TrusteeToken[] } | null)?.trusteeTokens
+  const fromCreate = (location.state as { trusteeTokens?: TrusteeToken[] } | null)?.trusteeTokens
+  // token-urile vin o singură dată, de la pagina de creare; rămân în acest tab până la „Am transmis”
+  const [trusteeTokens, setTrusteeTokens] = useState<TrusteeToken[] | undefined>(() => {
+    if (fromCreate) saveTrusteeTokens(id, fromCreate)
+    return fromCreate ?? loadTrusteeTokens(id)
+  })
+  useEffect(() => {
+    // scoase din istoricul browserului: altfel ar reapărea după „Am transmis” la o reîncărcare
+    if (fromCreate) navigate(location.pathname, { replace: true, state: null })
+  }, [fromCreate, location.pathname, navigate])
+  const forgetTokens = () => {
+    forgetTrusteeTokens(id)
+    setTrusteeTokens(undefined)
+  }
   const [busy, setBusy] = useState<string>()
   const [message, setMessage] = useState<{ kind: MessageKind; text: string }>()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // închiderea e ireversibilă (agregatul se publică, nu se mai poate vota), deci cere confirmare, ca ștergerea
+  const [confirmClose, setConfirmClose] = useState(false)
 
   /** Rulează o acțiune, afișează rezultatul și reîncarcă scrutinul. */
   const act = async (name: string, fn: () => Promise<unknown>, ok?: (value: unknown) => string) => {
@@ -83,6 +99,9 @@ export function CommissionElection() {
           <Link to={`/scrutin/${e.id}`} className="btn">
             Pagina publică
           </Link>
+          <Link to={`/scrutin/${e.id}/proces-verbal`} className="btn">
+            Proces-verbal
+          </Link>
           {editable && e.status === 'draft' && (
             <>
               <Link to={`/comisie/${e.id}/editare`} className="btn">
@@ -118,21 +137,32 @@ export function CommissionElection() {
               </button>
             </>
           )}
-          {editable && e.status === 'open' && (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={!!busy}
-              onClick={() =>
-                act(
-                  'close',
-                  () => api.closeElection(e.id),
-                  () => 'Votul este închis. Urmează decriptarea de către trustees.',
-                )
-              }
-            >
+          {editable && e.status === 'open' && !confirmClose && (
+            <button type="button" className="btn btn-danger" disabled={!!busy} onClick={() => setConfirmClose(true)}>
               Închide votul
             </button>
+          )}
+          {editable && e.status === 'open' && confirmClose && (
+            <>
+              <span className="muted small">Închiderea e definitivă: nimeni nu mai poate vota.</span>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={!!busy}
+                onClick={() =>
+                  act(
+                    'close',
+                    () => api.closeElection(e.id),
+                    () => 'Votul este închis. Urmează decriptarea de către trustees.',
+                  ).finally(() => setConfirmClose(false))
+                }
+              >
+                Da, închide votul acum
+              </button>
+              <button type="button" className="btn" onClick={() => setConfirmClose(false)}>
+                Nu
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -142,7 +172,7 @@ export function CommissionElection() {
 
       <Steps election={e} />
 
-      {trusteeTokens && e.status === 'draft' && <TrusteeTokens election={e} tokens={trusteeTokens} />}
+      {trusteeTokens && <TrusteeTokens election={e} tokens={trusteeTokens} onDone={forgetTokens} />}
 
       <div className="stats">
         <Stat label="Eligibili" value={e.stats.eligible} />
@@ -156,7 +186,7 @@ export function CommissionElection() {
           <h3>Trustees</h3>
           <p className="hint">
             {keysMissing > 0
-              ? `Lipsesc ${keysMissing} chei. Fiecare trustee rulează CLI-ul și trimite doar Yᵢ; cheia secretă rămâne la el.`
+              ? `${keysMissing === 1 ? 'Lipsește o cheie' : `Lipsesc ${plural(keysMissing, 'cheie', 'chei')}`}. Fiecare trustee rulează CLI-ul și trimite doar Yᵢ; cheia secretă rămâne la el.`
               : 'Toate cheile au fost primite, iar cheia scrutinului e publicată.'}
           </p>
           <ul className="list-plain">
@@ -192,6 +222,9 @@ export function CommissionElection() {
               </li>
             ))}
           </ol>
+          <p className="hint mt-s">
+            Înregistrare: {e.requireNfc ? 'doar cu cartea electronică (NFC), scanarea optică e refuzată.' : 'prin scanarea buletinului (OCR) sau prin NFC.'}
+          </p>
         </div>
       </div>
 

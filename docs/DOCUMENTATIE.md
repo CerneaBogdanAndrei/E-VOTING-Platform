@@ -62,11 +62,11 @@ Limitări asumate (din plan): rezistența la constrângere și la cumpărarea vo
 Toate componentele vorbesc doar cu backend-ul. O dovadă generată pe telefon e verificată de **exact același cod** pe server, în browser și în verificatorul CLI.
 
 ```
-packages/crypto/     ElGamal pe ristretto255, dovezi ZK, board, numărare, verificatorul public (+ 45 de teste)
+packages/crypto/     ElGamal pe ristretto255, dovezi ZK, board, numărare, verificatorul public, verificarea în paralel (+ 54 de teste)
 packages/api/        contractul HTTP (contract/), clientul (client/), backend-ul simulat (mock/), CNP, MRZ, DG1 (identity/),
-                     formatările comune (format.ts) (+ 20 de teste)
+                     formatările comune (format.ts) (+ 27 de teste)
 apps/backend/        NestJS + PostgreSQL, un folder per modul: admin, elections, trustees, registration, auth, ballots,
-                     tally, nfc, audit, system (+ 28 de teste e2e)
+                     tally, nfc, audit, system (+ 30 de teste e2e și 3 fără bază)
 apps/web/            panoul comisiei (scrutine, membri) și pagina publică: board, rezultat, verificare publică, audit Benaloh
 apps/mobile/         aplicația alegătorului (Expo + Expo Router) și modulele native modules/evoting-nfc, modules/evoting-ocr
 tools/trustee/       CLI: generarea cheii xᵢ (opțional criptată cu parolă), decriptarea parțială
@@ -107,7 +107,7 @@ Tehnologiile, conform planului:
 npm install                 # instalează toate pachetele monorepo-ului (fără aplicația mobilă)
 npm run build               # construiește pachetele, backend-ul, CLI-urile și site-ul
 npm run lint && npm run format:check
-npm test                    # 45 + 20 de teste unitare și 28 de teste end-to-end pe PostgreSQL
+npm test                    # 54 + 27 de teste unitare, 33 pentru server (30 end-to-end pe PostgreSQL), 11 pentru site (Vitest)
 ```
 
 Testele end-to-end folosesc baza `postgres://evoting:evoting@localhost:5432/evoting_test`, sau variabila `TEST_DATABASE_URL`. Dacă baza nu e disponibilă, sunt sărite cu un mesaj. Testele **golesc** baza la fiecare rulare. Cel mai simplu, cu Docker:
@@ -484,7 +484,7 @@ Migrarea `001_init.sql` creează primele nouă tabele și trigger-ul append-only
 
 | Tabelă | Conținut | Observații |
 | --- | --- | --- |
-| `elections` | titlu, stare, interval, cheia publică Y, agregatul | stări: draft → open → closed → tallied |
+| `elections` | titlu, stare, interval, cheia publică Y, `require_nfc` („doar NFC”), agregatul | stări: draft → open → closed → tallied |
 | `candidates` | nume, descriere, poziție, `kind` (`candidate` sau `blank`) | poziția = indicele în vectorul de vot; votul alb e ultimul |
 | `trustees` | nume, hash-ul token-ului, Yᵢ, dovada Schnorr | niciodată xᵢ |
 | `eligible_voters` | `cnp_hmac` | populată la import |
@@ -503,9 +503,9 @@ Migrarea `001_init.sql` creează primele nouă tabele și trigger-ul append-only
 | GET | `/elections`, `/elections/:id` | oricine | – |
 | GET | `/elections/:id/board`, `/board/page?page=&size=`, `/board/:hash`, `/board-head` | oricine | – |
 | GET | `/elections/:id/registrations`, `/tally`, `/result`, `/audit-bundle` | oricine | – |
-| POST | `/elections` | comisia | rolul `comisie` |
+| POST | `/elections` (cu `allowBlank`, `requireNfc`) | comisia | rolul `comisie` |
 | PATCH, DELETE | `/elections/:id` (doar în `draft`) | comisia | rolul `comisie` |
-| POST | `/elections/:id/eligible` (text/csv), `/open`, `/close` | comisia | rolul `comisie` |
+| POST | `/elections/:id/eligible` (text/csv), `/eligible/remove` (text/csv), `/open`, `/close` | comisia | rolul `comisie` |
 | GET | `/elections/:id/audit-log`, `/admin/members` | comisia | orice rol (și observatorii) |
 | GET | `/admin/check` | comisia | orice rol, limită strictă |
 | POST, DELETE | `/admin/members`, `/admin/members/:id` | comisia | rolul `comisie` (creare cu limită strictă) |
@@ -598,13 +598,15 @@ Rezultate obținute la rulare:
 
 | Suită | Teste | Ce acoperă |
 | --- | --- | --- |
-| `packages/crypto` | 45 | Pe fișiere: `encoding` (JSON canonic, HMAC cu vectorul RFC 4231, hex strict), `elgamal` (criptare, randomizare, homomorfism, BSGS), `ballot` (buletine valide, toate tipurile de buletine invalide, refolosirea dovezilor, forma, Benaloh), `trustee` (chei, decriptare, trustee care trișează), `verifier` (13 tipuri de manipulare, inclusiv ore în afara ordinii sau a intervalului, scrutin deschis, progres) |
-| `packages/api` | 20 | `cnp` (validare, format, generator), `mrz` (exemplele ICAO TD1 și TD2, buletin vechi, CEI, zgomot OCR, text fără MRZ), `dg1` (împachetare, DG1 invalid, base64), `mock` (scrutin complet, scrutinele de demonstrație, re-înregistrare, vot alb, modificare și ștergere, interval și închidere automată, uneltele de test și membrii) |
-| `apps/backend` | 28 | Pe PostgreSQL real: `election-flow.e2e` (16: tot fluxul, token-uri, import și după deschidere, re-înregistrare, NFC cu PKI de test, autentificare, buletine invalide, vot dublu simultan, trigger append-only, paginare, agregat, trustee care trișează, verificatorul, CNP absent din bază, manipulare directă în bază, jurnal de audit), `interval.e2e` (5: vot înainte de deschidere, deschidere după închidere, 16 voturi simultane cu ore crescătoare, ceasuri diferite, închiderea automată), `commission.e2e` (3: membri și roluri, modificare și ștergere, vot alb), `rate-limit.e2e` (3) și `cli.e2e` (1: `evoting-trustee` cu cheie criptată și necriptată, `evoting-verify` online și offline, ca procese separate) |
+| `packages/crypto` | 54 | Pe fișiere: `encoding` (JSON canonic, HMAC cu vectorul RFC 4231, hex strict), `elgamal` (criptare, randomizare, homomorfism, BSGS), `ballot` (buletine valide, toate tipurile de buletine invalide, refolosirea dovezilor, forma, Benaloh), `trustee` (chei, decriptare, trustee care trișează), `verifier` (13 tipuri de manipulare, inclusiv ore în afara ordinii sau a intervalului, scrutin deschis, progres), `parallel` (raport identic pe `worker_threads` reale, inclusiv cu buletine trișate; ordinea rezultatelor; agregatul pe bucăți; fir căzut; intrare malformată; Benaloh cu date incomplete; chei Ed25519 de ordin mic) |
+| `packages/api` | 27 | `format` (și procentele cu virgulă), `mock` (și scrutinul „doar NFC”), (acordul numeralelor, duratele, faza intervalului), `cnp` (validare, format, generator), `mrz` (exemplele ICAO TD1 și TD2, buletin vechi, CEI, zgomot OCR, text fără MRZ), `dg1` (împachetare, DG1 invalid, base64), `mock` (scoaterea din lista de eligibili, scrutin complet, scrutinele de demonstrație, re-înregistrare, vot alb, modificare și ștergere, interval și închidere automată, uneltele de test și membrii) |
+| `apps/backend` | 33 | `pg-options` (3, fără bază: SSL-ul conexiunii). Pe PostgreSQL real: `election-flow.e2e` (16: tot fluxul, token-uri, import și după deschidere, re-înregistrare, NFC cu PKI de test, autentificare, buletine invalide, vot dublu simultan, trigger append-only, paginare, agregat, trustee care trișează, verificatorul, CNP absent din bază, manipulare directă în bază, jurnal de audit), `interval.e2e` (5: vot înainte de deschidere, deschidere după închidere, 16 voturi simultane cu ore crescătoare, ceasuri diferite, închiderea automată), `commission.e2e` (5: membri și roluri, modificare și ștergere, vot alb, scoaterea din lista de eligibili, scrutinul „doar NFC” cu un cip de test), `rate-limit.e2e` (3) și `cli.e2e` (1: `evoting-trustee` cu cheie criptată și necriptată, `evoting-verify` online și offline, pe unul și pe două fire, un fișier Benaloh incomplet, ca procese separate) |
+
+| `apps/web` | 11 | Vitest + jsdom + Testing Library, site-ul întreg pe backend-ul simulat: `public` (7: lista, căutarea pe board fără alarma falsă, cod inexistent, Benaloh în trei culori, verificatorul, hash-ul publicat greșit, procesul-verbal), `commission` (4: închiderea cu confirmare, token-urile trustees, scoaterea din listă, „doar NFC”) |
 
 Pe lângă acestea, verificări manuale:
 
-- **Site:** testat cu Playwright, contra backend-ului real și în mod simulat.
+- **Site:** testat cu Playwright, contra backend-ului real și în mod simulat; pe 18 nov., din nou cap-coadă în Chrome (comisie, membri și roluri, import, trustees cu CLI-ul, vot, închidere cu confirmare, decriptare, verificare pe unul și pe 16 fire, Benaloh).
 - **Aplicația mobilă:**
   - verificarea de tipuri;
   - bundle-ul Android compilat în bytecode Hermes;
@@ -637,6 +639,7 @@ Toate măsurătorile sunt pe un singur calculator, unde clientul, serverul și P
 - Verificarea publică și închiderea cresc liniar cu numărul de buletine: ~24 ms per buletin la verificare, iar agregatul pentru 10.000 de buletine (30.000 de criptotexte decodate și adunate) se calculează în 7,8 s. Decriptarea parțială nu depinde de numărul de buletine (~13 ms per trustee), pentru că se aplică doar celor 3 criptotexte agregate.
 - Validarea unui buletin pe server (semnătură + dovezi) durează ~25 ms de CPU. Un singur proces Node validează deci ~40 de buletine pe secundă. Pentru alegerile unei facultăți e suficient: 10.000 de voturi într-o zi înseamnă sub 0,2 voturi pe secundă în medie.
 - Timpul de criptare de pe un telefon Android real e o metrică din plan care rămâne de măsurat pe dispozitiv. În browser, pe build-ul web al aplicației, criptarea a durat ~9 ms.
+- **Verificarea în paralel** (18 nov.): semnăturile, dovezile și agregatul se împart pe toate nucleele (`evoting-verify --workers N`, Web Workers pe site). Pe 1.000 de buletine, pe un PC cu 8 nuclee fizice (16 logice): ~30 s pe un fir, ~6 s pe 16 fire (de ~5 ori mai rapid), cu raport identic (`docs/evaluare/verificare-paralela-18-nov.json`; tabelul complet în `GHID-COMPLET.md`, Partea 12).
 
 **Remăsurat pe 18 noiembrie**, pe codul final (interval aplicat, provocări în bază, ora luată după blocare), cu 1.000 de alegători, pe un PC cu Windows și PostgreSQL în Docker Desktop (`docs/evaluare/simulare-1000-18-nov.json`): rezultatul a fost exact, iar verificatorul, inclusiv verificarea orelor, a trecut cu 8 alegători în paralel. Timpii au fost cu 25–30% mai mari la toate metricile (criptare 24,1 ms, trimitere 270 ms, 14,3 buletine/s, verificare 32,9 ms per buletin), inclusiv la cele care rulează doar local (criptarea, verificarea), deci diferența vine de la calculator, nu de la modificări.
 

@@ -11,7 +11,7 @@
 export * from './contract/index.js'
 export { createHttpClient, type HttpClientOptions } from './client/http.js'
 export { createMockBackend, type MockTools, type MockOptions } from './mock/index.js'
-export { checkCnp, isValidCnp, generateCnp, type CnpCheck } from './identity/cnp.js'
+export { checkCnp, isValidCnp, generateCnp, parseCnpList, type CnpCheck } from './identity/cnp.js'
 export { parseMrz, normalizeMrzLines, mrzCheckDigit, type MrzData, type MrzCheck, type MrzFormat } from './identity/mrz.js'
 export { buildTd1, buildTd2, type MrzInput } from './identity/mrz-build.js'
 export { mrzFromDg1, dg1FromMrz, base64ToBytes, bytesToBase64 } from './identity/dg1.js'

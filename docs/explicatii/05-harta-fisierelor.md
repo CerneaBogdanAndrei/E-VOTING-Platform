@@ -73,8 +73,10 @@ E-VOTING-Platform
 | `src/ballot.ts` | Construiește buletinul (criptotexte, dovezi, semnătură), îl verifică și face auditul Benaloh. |
 | `src/board.ts` | Registrul public: lanțul de hash-uri și verificarea propriului vot. |
 | `src/trustee.ts` | Cheile trustees și decriptarea parțială. |
-| `src/tally.ts` | Calculul totalurilor criptate și aflarea numerelor (baby-step giant-step). |
+| `src/tally.ts` | Calculul totalurilor criptate (și pe bucăți, pentru verificarea în paralel) și aflarea numerelor (baby-step giant-step). |
 | `src/verify.ts` | Verificatorul public, cu cei șase pași. |
+| `src/parallel.ts` | Verificarea în paralel: împarte board-ul în bucăți, le dă mai multor fire și pune rezultatele la loc, în ordine. |
+| `src/node/parallel.ts`, `src/node/worker.ts` | Firele din Node (`worker_threads`), pentru verificatorul din terminal, CLI-ul trustee și simulator. |
 | `src/index.ts` | Exportă tot ce folosesc celelalte pachete. |
 | `test/encoding.test.ts` | Codificări, JSON canonic, HMAC, hex invalid. |
 | `test/elgamal.test.ts` | Criptare, randomizare, adunarea criptotextelor, baby-step giant-step. |
@@ -110,7 +112,7 @@ E-VOTING-Platform
 | `src/voter.ts` | Pașii alegătorului: autentificare, criptare, trimitere, verificare. |
 | `src/format.ts` | Etichetele și formatările comune site-ului și aplicației (stări, date, durate, „Vot alb”, cât mai e din interval). |
 | `src/index.ts` | Exportă tot. |
-| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts` | 20 de teste: CNP, MRZ, DG1 și scrutine complete pe serverul simulat (inclusiv re-înregistrare, vot alb, interval, membri). |
+| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts`, `format.test.ts` | 27 de teste: CNP (și lista CSV), MRZ, DG1, formatările în română și scrutine complete pe serverul simulat (inclusiv re-înregistrare, vot alb, interval, membri, scoaterea din lista de eligibili, „doar NFC”). |
 | `README.md` | Harta pachetului. |
 
 ## `apps/backend/`: serverul
@@ -158,7 +160,8 @@ E-VOTING-Platform
 | `test/interval.e2e.test.ts` | 5 teste pentru intervalul scrutinului, orele de pe board și închiderea automată. |
 | `test/commission.e2e.test.ts` | 3 teste pentru membrii comisiei, modificare/ștergere și votul alb. |
 | `test/rate-limit.e2e.test.ts` | 3 teste pentru limitarea de rată și `/health`. |
-| `test/cli.e2e.test.ts` | 1 test care rulează CLI-urile reale (trustee și verificator). |
+| `test/cli.e2e.test.ts` | 1 test care rulează CLI-urile reale (trustee și verificator, pe unul și pe două fire). |
+| `test/pg-options.test.ts` | 3 teste, fără bază de date: când se folosește SSL la conexiunea cu baza. |
 | `test/helpers.ts` | Pregătește baza de test (o golește!) și pornește serverul pentru teste. |
 | `README.md` | Harta serverului și comenzile. |
 
@@ -205,6 +208,10 @@ E-VOTING-Platform
 | `src/pages/election/tabs/ParametersTab.tsx` | Parametrii publici. |
 | `src/lib/format.ts` | Formatările (re-exportate din `@evoting/api`). |
 | `src/lib/useAsync.ts` | Încărcarea datelor în pagini. |
+| `src/lib/verify-workers.ts`, `src/lib/verify.worker.ts` | Verificarea publică în paralel, în browser (Web Workers). |
+| `src/lib/trusteeTokens.ts` | Token-urile trustees păstrate în tab până la confirmare și descărcarea lor ca `.txt`. |
+| `src/pages/election/ProcesVerbal.tsx`, `src/styles/print.css` | Procesul-verbal de tipărit (sau salvat ca PDF) și stilurile de tipărire. |
+| `vitest.config.ts`, `test/` | Testele automate ale site-ului (Vitest, jsdom, Testing Library). |
 | `README.md` | Harta site-ului și comenzile. |
 
 ## `apps/mobile/`: aplicația de telefon
@@ -259,7 +266,7 @@ E-VOTING-Platform
 | `trustee/src/key-file.ts`, `output.ts` | Fișierul de cheie (permisiuni 600, opțional criptat cu parolă) și afișarea. |
 | `trustee/src/password.ts` | Parola fișierului de cheie: din argument, din mediu sau cerută în terminal. |
 | `verifier/src/cli.ts` | `evoting-verify`: citește argumentele și alege comanda. |
-| `verifier/src/commands/verify.ts` | Verificarea publică completă, de pe server sau dintr-un fișier. |
+| `verifier/src/commands/verify.ts` | Verificarea publică completă, de pe server sau dintr-un fișier, pe toate nucleele (`--workers N`). |
 | `verifier/src/commands/audit-ballot.ts` | Auditul unui buletin (Benaloh). |
 | `verifier/src/output.ts` | Afișarea. |
 | `simulator/src/cli.ts` | `evoting-simulate`: rulează un scrutin întreg cu mii de alegători sintetici și măsoară timpii. |

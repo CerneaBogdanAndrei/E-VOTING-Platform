@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { STEP_TITLES, verifyElection, type StepId, type VerificationReport } from '@evoting/crypto'
 import { api, apiMode, type Election } from '../../../api'
+import { decimal } from '../../../lib/format'
+import { browserThreads, createBrowserWork, workersAvailable } from '../../../lib/verify-workers'
+
+const THREADS = browserThreads()
 
 /** Verificatorul public rulează în browser, cu aceeași bibliotecă ca serverul și aplicația. */
 export function VerificationTab({ election }: { election: Election }) {
@@ -10,28 +14,35 @@ export function VerificationTab({ election }: { election: Election }) {
   const [error, setError] = useState<string>()
   const [head, setHead] = useState('')
   const [elapsed, setElapsed] = useState(0)
+  // semnăturile și dovezile ZK se pot verifica pe toate nucleele (Web Workers); bifa permite compararea cu un singur fir
+  const [parallel, setParallel] = useState(workersAvailable && THREADS > 1)
+  const [usedThreads, setUsedThreads] = useState(1)
 
   const run = async () => {
     setRunning(true)
     setReport(undefined)
     setError(undefined)
     const t = performance.now()
+    const work = parallel ? createBrowserWork(THREADS) : undefined
     try {
       const b = await api.getAuditBundle(election.id)
       const m = /^(\d+):([0-9a-fA-F]{64})$/.exec(head.trim())
       if (head.trim() && !m) throw new Error('Hash-ul publicat se scrie ca SEQ:HASH')
+      setUsedThreads(work?.threads ?? 1)
       const r = await verifyElection(
         { election: b.election, registrations: b.registrations, board: b.board, tally: b.tally, result: b.result },
         {
           publishedHead: m ? { seq: Number(m[1]), hash: m[2] } : undefined,
           onProgress: (step, done, total) => setProgress({ step, done, total }),
           yieldEvery: 4,
+          work,
         },
       )
       setReport(r)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
+      await work?.close()
       setElapsed(performance.now() - t)
       setRunning(false)
       setProgress(undefined)
@@ -39,13 +50,18 @@ export function VerificationTab({ election }: { election: Election }) {
   }
 
   const download = async () => {
-    const b = await api.getAuditBundle(election.id)
-    const url = URL.createObjectURL(new Blob([JSON.stringify(b)], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${election.id}-audit.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    setError(undefined)
+    try {
+      const b = await api.getAuditBundle(election.id)
+      const url = URL.createObjectURL(new Blob([JSON.stringify(b)], { type: 'application/json' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${election.id}-audit.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   return (
@@ -69,6 +85,12 @@ export function VerificationTab({ election }: { election: Election }) {
           Descarcă JSON
         </button>
       </div>
+      {workersAvailable && THREADS > 1 && (
+        <label className="check mt-s">
+          <input type="checkbox" checked={parallel} disabled={running} onChange={(ev) => setParallel(ev.target.checked)} />
+          În paralel, pe {THREADS} fire (Web Workers): semnăturile și dovezile buletinelor se împart între nucleele procesorului
+        </label>
+      )}
       {progress && (
         <div className="progress">
           <div className="progress-label">
@@ -88,7 +110,7 @@ export function VerificationTab({ election }: { election: Election }) {
         <>
           <div role="alert" className={`alert ${report.ok ? 'alert-ok' : 'alert-bad'}`}>
             {report.ok
-              ? `Toate verificările trec (${report.ballots} buletine, ${(elapsed / 1000).toFixed(1)} s).`
+              ? `Toate verificările trec (${report.ballots} buletine, ${decimal(elapsed / 1000)} s, ${usedThreads === 1 ? 'pe un fir' : `pe ${usedThreads} fire`}).`
               : 'Verificarea a picat: rezultatul nu este de încredere. Detaliile arată exact unde.'}
           </div>
           <ol className="report">

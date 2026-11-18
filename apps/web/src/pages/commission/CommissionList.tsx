@@ -15,7 +15,10 @@ export function CommissionList() {
         <div>
           <h1>Panoul comisiei</h1>
           <p className="lead">
-            {admin.name}, {roleLabel[admin.role]}. Creează scrutine, importă lista eligibililor și deschide sau închide votul.
+            {admin.name}, {roleLabel[admin.role]}.{' '}
+            {canEdit(admin)
+              ? 'Creează scrutine, importă lista eligibililor și deschide sau închide votul.'
+              : 'Vezi scrutinele, statisticile și jurnalul de audit, fără să poți schimba ceva.'}
           </p>
         </div>
         <div className="row gap-s">

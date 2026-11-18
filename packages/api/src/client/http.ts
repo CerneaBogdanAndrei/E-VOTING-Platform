@@ -62,6 +62,7 @@ export function createHttpClient(baseUrl: string, options: HttpClientOptions = {
     updateElection: (id, input) => request('PATCH', e(id), { body: input, token: admin() }),
     deleteElection: (id) => request('DELETE', e(id), { token: admin() }),
     importEligible: (id, csv) => request('POST', `${e(id)}/eligible`, { body: csv, contentType: 'text/csv', token: admin() }),
+    removeEligible: (id, csv) => request('POST', `${e(id)}/eligible/remove`, { body: csv, contentType: 'text/csv', token: admin() }),
     openElection: (id) => request('POST', `${e(id)}/open`, { token: admin() }),
     closeElection: (id) => request('POST', `${e(id)}/close`, { token: admin() }),
     getAuditLog: (id) => request('GET', `${e(id)}/audit-log`, { token: admin() }),

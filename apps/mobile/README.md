@@ -1,6 +1,6 @@
 # @evoting/mobile
 
-Aplicația alegătorului: înregistrare cu buletinul (OCR pe MRZ sau NFC pe CEI), vot criptat pe telefon, provocarea Benaloh, verificarea votului pe board. Expo SDK 57 + React Native 0.86 + Expo Router, cu două module native Kotlin.
+Aplicația alegătorului: înregistrare cu buletinul (OCR pe MRZ sau NFC pe CEI; la scrutinele „doar NFC”, numai NFC), vot criptat pe telefon, provocarea Benaloh, verificarea votului pe board. Expo SDK 57 + React Native 0.86 + Expo Router, cu două module native Kotlin.
 
 ```bash
 cd apps/mobile && npm install          # instalare separată de restul monorepo-ului (vezi package.json)

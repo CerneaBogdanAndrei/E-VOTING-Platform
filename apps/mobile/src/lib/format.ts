@@ -2,6 +2,7 @@
 export {
   BLANK_LABEL,
   candidateLabel,
+  decimal,
   errorMessage,
   formatDateTime,
   formatDuration,
@@ -9,6 +10,7 @@ export {
   groupHash,
   intervalPhase,
   percent,
+  plural,
   shortHash,
   statusLabel,
   trustLabel,

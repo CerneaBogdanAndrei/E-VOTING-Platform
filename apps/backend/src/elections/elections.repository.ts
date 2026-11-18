@@ -31,6 +31,7 @@ export interface LockedElection {
   opens_at: Date
   closes_at: Date
   public_key: string | null
+  require_nfc: boolean
   aggregate: TallyInfo['aggregate']
 }
 
@@ -73,6 +74,7 @@ export class ElectionsRepository {
       opensAt: r.opens_at.toISOString(),
       closesAt: r.closes_at.toISOString(),
       publicKey: r.public_key,
+      requireNfc: r.require_nfc,
       candidates: candidates.rows.filter((c) => c.election_id === r.id).map(toCandidate),
       trustees: trustees.rows
         .filter((t) => t.election_id === r.id)
@@ -105,9 +107,10 @@ export class ElectionsRepository {
 
   /** Blochează rândul scrutinului până la finalul tranzacției (serializează schimbările de stare și adăugările pe board). */
   async lock(client: Queryable, id: string): Promise<LockedElection> {
-    const { rows } = await client.query<LockedElection>('SELECT status, opens_at, closes_at, public_key, aggregate FROM elections WHERE id = $1 FOR UPDATE', [
-      id,
-    ])
+    const { rows } = await client.query<LockedElection>(
+      'SELECT status, opens_at, closes_at, public_key, require_nfc, aggregate FROM elections WHERE id = $1 FOR UPDATE',
+      [id],
+    )
     if (!rows[0]) throw new NotFoundException('Scrutinul nu există')
     return rows[0]
   }

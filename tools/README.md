@@ -20,7 +20,7 @@ Verificatorul public: reface cheile, lanțul de hash-uri, semnăturile, dovezile
 
 ```bash
 npx evoting-verify --api http://localhost:3000 --election <ID> [--head SEQ:HASH] [--save arhiva.json] [--json]
-npx evoting-verify --bundle arhiva.json
+npx evoting-verify --bundle arhiva.json [--workers N]     # N fire; implicit toate nucleele, 1 = un singur fir
 npx evoting-verify audit-ballot --election <ID> --file audit.json
 ```
 

@@ -4,5 +4,8 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src"]
+  "include": ["src"],
+  // src/node folosește module Node (worker_threads); se compilează separat, cu tsconfig.node.json,
+  // ca restul bibliotecii să nu poată folosi din greșeală API-uri care lipsesc în browser și pe telefon
+  "exclude": ["src/node"]
 }
