@@ -64,9 +64,9 @@ Toate componentele vorbesc doar cu backend-ul. O dovadă generată pe telefon e 
 ```
 packages/crypto/     ElGamal pe ristretto255, dovezi ZK, board, numărare, verificatorul public, verificarea în paralel (+ 54 de teste)
 packages/api/        contractul HTTP (contract/), clientul (client/), backend-ul simulat (mock/), CNP, MRZ, DG1 (identity/),
-                     formatările comune (format.ts) (+ 23 de teste)
+                     formatările comune (format.ts) (+ 25 de teste)
 apps/backend/        NestJS + PostgreSQL, un folder per modul: admin, elections, trustees, registration, auth, ballots,
-                     tally, nfc, audit, system (+ 28 de teste e2e și 3 fără bază)
+                     tally, nfc, audit, system (+ 29 de teste e2e și 3 fără bază)
 apps/web/            panoul comisiei (scrutine, membri) și pagina publică: board, rezultat, verificare publică, audit Benaloh
 apps/mobile/         aplicația alegătorului (Expo + Expo Router) și modulele native modules/evoting-nfc, modules/evoting-ocr
 tools/trustee/       CLI: generarea cheii xᵢ (opțional criptată cu parolă), decriptarea parțială
@@ -107,7 +107,7 @@ Tehnologiile, conform planului:
 npm install                 # instalează toate pachetele monorepo-ului (fără aplicația mobilă)
 npm run build               # construiește pachetele, backend-ul, CLI-urile și site-ul
 npm run lint && npm run format:check
-npm test                    # 54 + 23 de teste unitare, 31 pentru server (28 end-to-end pe PostgreSQL)
+npm test                    # 54 + 25 de teste unitare, 32 pentru server (29 end-to-end pe PostgreSQL)
 ```
 
 Testele end-to-end folosesc baza `postgres://evoting:evoting@localhost:5432/evoting_test`, sau variabila `TEST_DATABASE_URL`. Dacă baza nu e disponibilă, sunt sărite cu un mesaj. Testele **golesc** baza la fiecare rulare. Cel mai simplu, cu Docker:
@@ -505,7 +505,7 @@ Migrarea `001_init.sql` creează primele nouă tabele și trigger-ul append-only
 | GET | `/elections/:id/registrations`, `/tally`, `/result`, `/audit-bundle` | oricine | – |
 | POST | `/elections` | comisia | rolul `comisie` |
 | PATCH, DELETE | `/elections/:id` (doar în `draft`) | comisia | rolul `comisie` |
-| POST | `/elections/:id/eligible` (text/csv), `/open`, `/close` | comisia | rolul `comisie` |
+| POST | `/elections/:id/eligible` (text/csv), `/eligible/remove` (text/csv), `/open`, `/close` | comisia | rolul `comisie` |
 | GET | `/elections/:id/audit-log`, `/admin/members` | comisia | orice rol (și observatorii) |
 | GET | `/admin/check` | comisia | orice rol, limită strictă |
 | POST, DELETE | `/admin/members`, `/admin/members/:id` | comisia | rolul `comisie` (creare cu limită strictă) |
@@ -599,8 +599,8 @@ Rezultate obținute la rulare:
 | Suită | Teste | Ce acoperă |
 | --- | --- | --- |
 | `packages/crypto` | 54 | Pe fișiere: `encoding` (JSON canonic, HMAC cu vectorul RFC 4231, hex strict), `elgamal` (criptare, randomizare, homomorfism, BSGS), `ballot` (buletine valide, toate tipurile de buletine invalide, refolosirea dovezilor, forma, Benaloh), `trustee` (chei, decriptare, trustee care trișează), `verifier` (13 tipuri de manipulare, inclusiv ore în afara ordinii sau a intervalului, scrutin deschis, progres), `parallel` (raport identic pe `worker_threads` reale, inclusiv cu buletine trișate; ordinea rezultatelor; agregatul pe bucăți; fir căzut; intrare malformată; Benaloh cu date incomplete; chei Ed25519 de ordin mic) |
-| `packages/api` | 23 | `format` (acordul numeralelor, duratele, faza intervalului), `cnp` (validare, format, generator), `mrz` (exemplele ICAO TD1 și TD2, buletin vechi, CEI, zgomot OCR, text fără MRZ), `dg1` (împachetare, DG1 invalid, base64), `mock` (scrutin complet, scrutinele de demonstrație, re-înregistrare, vot alb, modificare și ștergere, interval și închidere automată, uneltele de test și membrii) |
-| `apps/backend` | 31 | `pg-options` (3, fără bază: SSL-ul conexiunii). Pe PostgreSQL real: `election-flow.e2e` (16: tot fluxul, token-uri, import și după deschidere, re-înregistrare, NFC cu PKI de test, autentificare, buletine invalide, vot dublu simultan, trigger append-only, paginare, agregat, trustee care trișează, verificatorul, CNP absent din bază, manipulare directă în bază, jurnal de audit), `interval.e2e` (5: vot înainte de deschidere, deschidere după închidere, 16 voturi simultane cu ore crescătoare, ceasuri diferite, închiderea automată), `commission.e2e` (3: membri și roluri, modificare și ștergere, vot alb), `rate-limit.e2e` (3) și `cli.e2e` (1: `evoting-trustee` cu cheie criptată și necriptată, `evoting-verify` online și offline, pe unul și pe două fire, un fișier Benaloh incomplet, ca procese separate) |
+| `packages/api` | 25 | `format` (acordul numeralelor, duratele, faza intervalului), `cnp` (validare, format, generator), `mrz` (exemplele ICAO TD1 și TD2, buletin vechi, CEI, zgomot OCR, text fără MRZ), `dg1` (împachetare, DG1 invalid, base64), `mock` (scoaterea din lista de eligibili, scrutin complet, scrutinele de demonstrație, re-înregistrare, vot alb, modificare și ștergere, interval și închidere automată, uneltele de test și membrii) |
+| `apps/backend` | 32 | `pg-options` (3, fără bază: SSL-ul conexiunii). Pe PostgreSQL real: `election-flow.e2e` (16: tot fluxul, token-uri, import și după deschidere, re-înregistrare, NFC cu PKI de test, autentificare, buletine invalide, vot dublu simultan, trigger append-only, paginare, agregat, trustee care trișează, verificatorul, CNP absent din bază, manipulare directă în bază, jurnal de audit), `interval.e2e` (5: vot înainte de deschidere, deschidere după închidere, 16 voturi simultane cu ore crescătoare, ceasuri diferite, închiderea automată), `commission.e2e` (4: membri și roluri, modificare și ștergere, vot alb, scoaterea din lista de eligibili), `rate-limit.e2e` (3) și `cli.e2e` (1: `evoting-trustee` cu cheie criptată și necriptată, `evoting-verify` online și offline, pe unul și pe două fire, un fișier Benaloh incomplet, ca procese separate) |
 
 Pe lângă acestea, verificări manuale:
 

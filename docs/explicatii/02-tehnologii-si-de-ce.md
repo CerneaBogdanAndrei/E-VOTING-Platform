@@ -323,7 +323,7 @@ Fișierele sunt în `.github/workflows/` și sunt scrise în **YAML** (un format
 
 | Workflow | Când rulează | Ce face |
 | --- | --- | --- |
-| `ci.yml` | La fiecare push | Pornește un PostgreSQL de test, instalează tot, rulează linterul, verificarea formatării, cele 108 teste, build-ul și `npm audit`. Separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
+| `ci.yml` | La fiecare push | Pornește un PostgreSQL de test, instalează tot, rulează linterul, verificarea formatării, cele 111 teste, build-ul și `npm audit`. Separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
 | `android-apk.yml` | Când se schimbă `apps/mobile` sau `packages`, sau manual | Instalează Java 17 (Android SDK există deja pe serverele GitHub), rulează `expo prebuild` și `gradlew assembleRelease`, apoi salvează APK-ul în `apk/` și îl face commit. |
 
 **De ce pe GitHub:** construirea unui APK cere Android SDK (câțiva GB). Pe serverele GitHub e gratuit și nu-ți ocupă PC-ul.

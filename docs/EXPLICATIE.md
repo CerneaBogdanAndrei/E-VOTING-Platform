@@ -148,7 +148,7 @@ Din punctele slabe găsite de analiză (`ANALIZA.md`) s-au rezolvat cele mai imp
 - **Trustees:** fișierul de cheie se poate cripta cu parolă (`tools/trustee/src/key-file.ts`, `password.ts`).
 - **Verificatorul** verifică și orele primirii (crescătoare și în interval).
 - **HTTPS în Docker Compose**, prin Caddy (`infra/Caddyfile`).
-- **Calitate:** `prettier` și `oxlint` la rădăcină, pași noi în CI, formatările comune mutate în `packages/api/src/format.ts`, CLI-urile testate ca procese separate. Testele au crescut de la 78 la 93, apoi la 108 după a doua verificare (verificarea în paralel și reparațiile găsite în Chrome; vezi `GHID-COMPLET.md`, 9.15–9.17).
+- **Calitate:** `prettier` și `oxlint` la rădăcină, pași noi în CI, formatările comune mutate în `packages/api/src/format.ts`, CLI-urile testate ca procese separate. Testele au crescut de la 78 la 93, apoi la 111 după a doua verificare (verificarea în paralel, reparațiile găsite în Chrome, scoaterea din lista de eligibili; vezi `GHID-COMPLET.md`, 9.15–9.19).
 - **La verificarea finală (18 nov.)** s-au reparat două probleme: ora primirii se ia acum după blocarea board-ului (altfel două voturi simultane puteau intra în ordinea inversă orelor, iar verificatorul ar fi raportat fals o manipulare) și verificarea de sănătate a containerului backend folosește `127.0.0.1` (cu `localhost`, Docker îl marca „unhealthy”). Apoi tot sistemul a fost pornit cu Docker Compose și un scrutin complet a trecut prin HTTPS.
 
 ---
@@ -184,7 +184,7 @@ Din punctele slabe găsite de analiză (`ANALIZA.md`) s-au rezolvat cele mai imp
 
 | Fișier | Ce face |
 | --- | --- |
-| `ci.yml` | La fiecare push, pe serverele GitHub: instalează tot, rulează linterul și verificarea formatării, cele 108 teste (cu un PostgreSQL pornit ca serviciu), construiește tot și rulează `npm audit`; separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
+| `ci.yml` | La fiecare push, pe serverele GitHub: instalează tot, rulează linterul și verificarea formatării, cele 111 teste (cu un PostgreSQL pornit ca serviciu), construiește tot și rulează `npm audit`; separat, verifică tipurile aplicației mobile și o împachetează pentru Android. |
 | `android-apk.yml` | Construiește APK-ul. Pornește când se modifică aplicația mobilă sau pachetele comune, sau manual (Actions → Android APK → Run workflow). Pașii: Node 22 și Java 17, construirea pachetelor comune, `expo prebuild` (generează proiectul Android), `gradlew assembleRelease` (compilează; doar arm64, ca fișierul să fie mai mic), apoi copierea APK-ului în `apk/`, încărcarea lui ca artifact și commit-ul pe branch. Câmpul opțional `api_url` leagă APK-ul de un server real. |
 
 ## `packages/crypto/`: criptografia
@@ -367,7 +367,7 @@ Numele pachetului (`@evoting/crypto`), comenzile `build` și `test` și setăril
 | `src/identity/dg1.ts` | DG1 e structura `61 { 5F1F <MRZ> }`: scoate MRZ-ul din DG1 (și invers, pentru teste), base64 ↔ octeți. |
 | `src/voter.ts` | Pașii alegătorului: `authenticate`, `prepareBallot`, `submitBallot`, `verifyOwnBallot`. |
 | `src/format.ts` | Etichetele și formatările comune site-ului și aplicației: stări, metode, niveluri, roluri, „Vot alb”, date, hash-uri, procente, durate, poziția față de interval (`intervalPhase`). |
-| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts`, `format.test.ts` | 23 de teste: acordul numeralelor și duratele în română, CNP, exemplele oficiale ICAO, buletinul vechi, CEI, zgomot OCR, DG1 și, pe backend-ul simulat, un scrutin complet verificat de verificatorul public, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii. |
+| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts`, `format.test.ts` | 25 de teste: acordul numeralelor și duratele în română, lista CSV de CNP-uri, scoaterea din lista de eligibili pe backend-ul simulat, CNP, exemplele oficiale ICAO, buletinul vechi, CEI, zgomot OCR, DG1 și, pe backend-ul simulat, un scrutin complet verificat de verificatorul public, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii. |
 
 ## `apps/backend/`: serverul
 
@@ -469,6 +469,7 @@ Un folder per modul; `src/app.module.ts` le enumeră.
 | `src/pages/election/tabs/` | `BoardTab` (căutarea codului verifică local hash-urile; board-ul pe pagini de câte 50), `ResultTab` (votul alb separat), `VerificationTab` (verificatorul cu bară de progres și raport), `BenalohTab` (auditul unui buletin), `ParametersTab`. |
 | `src/lib/format.ts`, `src/lib/useAsync.ts` | Formatările (re-exportate din `@evoting/api`) și încărcarea asincronă a datelor în pagini. |
 | `src/lib/verify-workers.ts`, `src/lib/verify.worker.ts` | Verificarea publică în paralel, pe Web Workers (câte unul pe nucleu, cel mult 16). |
+| `src/lib/trusteeTokens.ts` | Token-urile trustees păstrate în `sessionStorage` până când comisia confirmă că le-a transmis; fișierul `.txt` cu comenzile. |
 | `src/styles/` | CSS-ul pe module, importate în ordine de `index.css`: `tokens` (culorile), `base`, `layout`, `cards`, `forms`, `feedback`, `tables`, `results`, `verification`, `responsive`. |
 | `Dockerfile`, `nginx.conf` | Imaginea Docker: build-ul cu Vite, servit apoi de nginx. |
 

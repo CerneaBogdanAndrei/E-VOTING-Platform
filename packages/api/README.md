@@ -16,6 +16,6 @@ Stratul comun dintre clienți (web, mobil, CLI-uri) și server: contractul HTTP,
 
 ## Teste
 
-`npm test -w @evoting/api` rulează 23 de teste: `cnp.test.ts` (3), `mrz.test.ts` (7), `dg1.test.ts` (3), `format.test.ts` (3: acordul numeralelor, duratele, faza intervalului), `mock.test.ts` (7: un scrutin complet pe backend-ul simulat, verificat de verificatorul public; scrutinele de demonstrație; re-înregistrarea; votul alb; modificarea și ștergerea; intervalul și închiderea automată; uneltele de test și membrii).
+`npm test -w @evoting/api` rulează 25 de teste: `cnp.test.ts` (4, inclusiv lista CSV), `mrz.test.ts` (7), `dg1.test.ts` (3), `format.test.ts` (3: acordul numeralelor, duratele, faza intervalului), `mock.test.ts` (8: scoaterea din lista de eligibili; un scrutin complet pe backend-ul simulat, verificat de verificatorul public; scrutinele de demonstrație; re-înregistrarea; votul alb; modificarea și ștergerea; intervalul și închiderea automată; uneltele de test și membrii).
 
 Detalii: [docs/DOCUMENTATIE.md §6](../../docs/DOCUMENTATIE.md#6-identitatea-cnp-mrz-și-nfc) și [docs/explicatii/03](../../docs/explicatii/03-cum-circula-cererile.md).

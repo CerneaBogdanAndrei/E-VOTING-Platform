@@ -115,12 +115,12 @@ Comportamentul nu s-a schimbat; toate exporturile publice ale pachetelor sunt ac
 
 ## 5. Ce s-a rezolvat după analiză (17–18 noiembrie)
 
-Din cele 30 de puncte din secțiunea 2: **12 rezolvate, 6 parțial, 12 rămase**. Testele au crescut de la 78 la 93 (crypto 45, api 20, backend 28), apoi, la a doua verificare din 18 nov., la 108 (crypto 54, api 23, backend 31).
+Din cele 30 de puncte din secțiunea 2: **13 rezolvate, 5 parțial, 12 rămase**. Testele au crescut de la 78 la 93 (crypto 45, api 20, backend 28), apoi, la a doua verificare din 18 nov., la 111 (crypto 54, api 25, backend 32).
 
 | # | Punctul | Starea | Ce s-a făcut / ce lipsește |
 | --- | --- | --- | --- |
 | 1 | Intervalul decorativ | rezolvat | Votul e refuzat înainte de `opensAt` și după `closesAt`; serverul închide singur la `closesAt` (`AutoCloseService`, la fiecare minut); deschiderea e refuzată dacă data închiderii a trecut; site-ul și aplicația arată cât mai e. |
-| 2 | Eligibili doar în `draft`, fără ștergere | parțial | Importul merge și cu votul deschis. Ștergerea unui CNP din listă nu există. |
+| 2 | Eligibili doar în `draft`, fără ștergere | rezolvat | Importul merge și cu votul deschis. Scoaterea din listă (18 nov.): `POST /elections/:id/eligible/remove`, în configurare sau cu votul deschis; înregistrarea celor care n-au votat se șterge și ea, cine a votat rămâne; în jurnal doar numerele. |
 | 3 | Scrutinul nu se poate edita sau șterge | rezolvat | `PATCH` și `DELETE /elections/:id`, în `draft` (titlu, interval, candidați, vot alb); trustees rămân. Anularea unui scrutin deschis nu există. |
 | 4 | Comisia e un singur token | rezolvat | Membri cu nume, rol (`comisie` / `observator`) și token propriu (doar SHA-256 pe server), revocare; actorul din jurnal e `comisie:<nume>`. `ADMIN_TOKEN` rămâne rădăcina. |
 | 5 | Politica de revot neexplicată | rămâne | „Primul vot contează”, explicat într-o propoziție pe ecranul de confirmare. |
@@ -143,7 +143,7 @@ Din cele 30 de puncte din secțiunea 2: **12 rezolvate, 6 parțial, 12 rămase**
 | 22 | Verificare liniară, pe un fir | rezolvat | Semnăturile, dovezile și agregatul se verifică pe bucăți, pe toate nucleele: `worker_threads` (`evoting-verify --workers N`, CLI-ul trustee, simulatorul) și Web Workers (site). Raport identic cu cel pe un fir. 1.000 de buletine: ~30 s → ~6 s pe 16 nuclee logice (×4,9; i7-10700F, 8 nuclee fizice) (`docs/evaluare/verificare-paralela-18-nov.json`). Semnăturile în lot rămân. |
 | 23 | ~25 ms de validare per buletin pe server | rămâne | |
 | 24 | `useAsync` și `format.ts` duplicate | parțial | Formatările sunt acum în `packages/api/src/format.ts`, comune; `useAsync` e încă duplicat. |
-| 25 | Fără teste pentru interfețe | rămâne | |
+| 25 | Fără teste pentru interfețe | rămâne | Interfața testată cap-coadă în Chrome pe 18 nov. Testele automate cer Vitest, jsdom și Testing Library (instalarea, neaprobată încă). |
 | 26 | Fără teste pentru CLI-uri | rezolvat | `cli.e2e.test.ts` rulează `evoting-trustee` și `evoting-verify` ca procese separate (simulatorul nu are test propriu). |
 | 27 | Fără linter și formatter unitar | rezolvat | `oxlint` și `prettier` la rădăcină; CI rulează `lint` și `format:check`. |
 | 28 | Versiuni foarte noi, fără `npm audit` | parțial | `npm audit` în CI (fără să blocheze); planul de actualizare rămâne. |
@@ -152,6 +152,6 @@ Din cele 30 de puncte din secțiunea 2: **12 rezolvate, 6 parțial, 12 rămase**
 
 Pe lângă acestea, la verificarea finală (18 nov.) s-au reparat două probleme: ora primirii putea ieși în ordine inversă la voturi simultane (acum se ia după blocarea board-ului; două teste noi) și verificarea de sănătate a containerului backend chema `localhost` (IPv6 în container) și marca serverul „unhealthy”; acum cheamă `127.0.0.1`.
 
-**A doua verificare (18 nov., seara).** Codul a fost recitit integral, testele rulate pe PostgreSQL și site-ul folosit cap-coadă în Chrome (comisie, membri, trustees cu CLI-ul, vot, închidere, decriptare, verificare). Reparate: o alarmă falsă „conținut modificat” în căutarea de pe board după editarea câmpului; o acuzație falsă la auditul Benaloh cu date incomplete (acum avertisment, codul 2 în CLI); confirmare la „Închide votul”; CLI-urile care se prăbușeau pe Windows la `process.exit()` după `fetch` (cod de ieșire greșit); `format:check` picat local pe Windows din cauza CRLF (`.gitattributes` cere LF); `sslmode=disable` ignorat; erorile ascunse de închiderea automată; cheile Ed25519 de ordin mic acceptate ca credential; o intrare malformată care oprea verificatorul; acordul numeralelor în română. Detalii în `GHID-COMPLET.md`, 9.15–9.17.
+**A doua verificare (18 nov., seara).** Codul a fost recitit integral, testele rulate pe PostgreSQL și site-ul folosit cap-coadă în Chrome (comisie, membri, trustees cu CLI-ul, vot, închidere, decriptare, verificare). Reparate: o alarmă falsă „conținut modificat” în căutarea de pe board după editarea câmpului; o acuzație falsă la auditul Benaloh cu date incomplete (acum avertisment, codul 2 în CLI); confirmare la „Închide votul”; CLI-urile care se prăbușeau pe Windows la `process.exit()` după `fetch` (cod de ieșire greșit); `format:check` picat local pe Windows din cauza CRLF (`.gitattributes` cere LF); `sslmode=disable` ignorat; erorile ascunse de închiderea automată; cheile Ed25519 de ordin mic acceptate ca credential; o intrare malformată care oprea verificatorul; acordul numeralelor în română. Apoi: scoaterea din lista de eligibili (punctul 2) și token-urile trustees păstrate în tab până la confirmare (nu se mai pierd la navigare). Detalii în `GHID-COMPLET.md`, 9.15–9.19.
 
 **Ce urmează**, din planul de mai sus: etapa C (t-din-n, CSCA România, autoritatea de înregistrare, semnăturile în lot) și etapa D (teste pentru interfețe, `useAsync` comun, măsurători pe telefon).

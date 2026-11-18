@@ -574,7 +574,7 @@ Tot ce au în comun clienții (site, telefon, CLI-uri) cu serverul: forma cereri
 | `package.json`, `tsconfig*.json`, `README.md` | Ca la `crypto`; singura dependență e `@evoting/crypto`. |
 | `src/index.ts` | Exporturile pachetului `@evoting/api`. |
 | `src/contract/index.ts` | Adună toate tipurile contractului. |
-| `src/contract/election.ts` | Scrutinul (`Election`, stările, `Candidate` cu `kind: 'candidate' \| 'blank'`, `Trustee`, statisticile), cererile comisiei (`CreateElectionInput` cu `allowBlank`, `UpdateElectionInput`), token-urile trustees, rezultatul importului. |
+| `src/contract/election.ts` | Scrutinul (`Election`, stările, `Candidate` cu `kind: 'candidate' \| 'blank'`, `Trustee`, statisticile), cererile comisiei (`CreateElectionInput` cu `allowBlank`, `UpdateElectionInput`), token-urile trustees, rezultatul importului și al scoaterii din listă (`EligibleRemoveResult`). |
 | `src/contract/voter.ts` | Înregistrarea (OCR, NFC, nivelul de încredere, `replacedPrevious` la re-înregistrare), provocarea, sesiunea, chitanța votului (`BallotReceipt`). |
 | `src/contract/board.ts` | Ce publică serverul pentru verificare: capul board-ului, o pagină din board (`BoardPage`), agregatul, rezultatul, jurnalul, pachetul de audit. |
 | `src/contract/admin.ts` | Comisia: rolurile `comisie` / `observator`, identitatea autentificată, membrii, membrul creat (cu token-ul afișat o dată). |
@@ -589,16 +589,16 @@ Tot ce au în comun clienții (site, telefon, CLI-uri) cu serverul: forma cereri
 | `src/mock/tools.ts` | **Uneltele de test**: țin locul CLI-ului de trustee și al alegătorilor (chei simulate, alegători simulați, decriptare simulată, un CNP propriu adăugat în listă, MRZ de test). |
 | `src/mock/random.ts` | Numere aleatoare cu sămânță (ca demonstrațiile să fie la fel la fiecare pornire), latență, copiere. |
 | `src/mock/contract-helpers.ts` | Re-exporturi și două constante (sufixul ID-ului „vot alb”, identitatea comisiei în simulator). |
-| `src/identity/cnp.ts` | Validarea CNP-ului (format, prima cifră, data, județul, cifra de control) și un generator de CNP-uri fictive valide. |
+| `src/identity/cnp.ts` | Validarea CNP-ului (format, prima cifră, data, județul, cifra de control), un generator de CNP-uri fictive valide și `parseCnpList` (CSV-ul cu CNP-uri: antet, coloane, ghilimele, liniile greșite cu numărul lor), comun importului și scoaterii, pe serverul real și pe cel simulat. |
 | `src/identity/mrz.ts` | Parserul MRZ (TD1, TD2, TD3): curăță textul OCR, corectează confuziile (O/0, I/1, „«”), verifică toate cifrele de control, reconstituie CNP-ul, spune dacă actul e expirat. |
 | `src/identity/mrz-build.ts` | Construiește MRZ-uri de test (TD1 pentru CEI, TD2 pentru buletinul vechi). |
 | `src/identity/dg1.ts` | DG1 de pe cip: extrage MRZ-ul din structura binară `61 { 5F1F <MRZ> }` și invers; conversii base64. |
 | `src/voter.ts` | **Pașii alegătorului**, comuni telefonului, simulatorului și testelor: `authenticate` (provocare semnată → sesiune), `prepareBallot` (criptare), `submitBallot` (autentificare + trimitere), `verifyOwnBallot` (caută codul și verifică local). |
 | `src/format.ts` | Etichete și formatări comune site-ului și telefonului: numele stărilor, metodelor, nivelurilor și rolurilor, „Vot alb”, date în română, hash-uri scurtate, procente, `plural` („1 cheie”, „2 chei”, „20 de chei”), durate („2 zile și 3 ore”, „21 de ore”), poziția față de intervalul scrutinului (`intervalPhase`). |
-| `test/cnp.test.ts` | 3 teste: validarea, formatele greșite, generatorul. |
+| `test/cnp.test.ts` | 4 teste: validarea, formatele greșite, generatorul, lista CSV. |
 | `test/mrz.test.ts` | 7 teste: exemplele oficiale ICAO, buletinul vechi, CEI, zgomotul OCR, text fără MRZ. |
 | `test/dg1.test.ts` | 3 teste: împachetare/despachetare, DG1 invalid, base64. |
-| `test/mock.test.ts` | 7 teste: un scrutin complet pe backend-ul simulat (verificat de verificatorul public), scrutinele de demonstrație, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul și închiderea automată, uneltele de test și membrii comisiei. |
+| `test/mock.test.ts` | 8 teste: un scrutin complet pe backend-ul simulat (verificat de verificatorul public), scrutinele de demonstrație, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul și închiderea automată, uneltele de test și membrii comisiei, scoaterea din lista de eligibili. |
 | `test/format.test.ts` | 3 teste: acordul numeralelor („20 de chei”, „105 voturi”), duratele, faza intervalului. |
 
 ## 4.5 `apps/backend`: serverul
@@ -650,7 +650,7 @@ NestJS + PostgreSQL. Un folder per modul (o „responsabilitate”). Fiecare mod
 | `src/audit/audit.service.ts` | Jurnalul de audit: scrie și citește acțiunile comisiei, ale trustees, ale alegătorilor (fără date personale) și ale serverului. |
 | `src/elections/elections.controller.ts` | **Toate rutele `/elections`**: citirile publice, acțiunile comisiei, trustees și alegătorul. Doar leagă fiecare rută de serviciul potrivit și pune protecțiile (guard, limită de rată). Ruta paginată `board/page` e declarată înaintea lui `board/:hash`, ca „page” să nu fie luat drept cod de urmărire. |
 | `src/elections/elections.repository.ts` | **Citirile**: scrutinele cu candidații, trustees și statisticile lor, board-ul (întreg sau pe pagini), căutarea după cod, capul board-ului, înregistrările publice, agregatul, rezultatul, pachetul de audit (dintr-un singur instantaneu `REPEATABLE READ`). Plus `lock` (blochează rândul scrutinului până la sfârșitul tranzacției) și `params` (cheia, numărul de opțiuni, starea și intervalul). |
-| `src/elections/elections.service.ts` | **Acțiunile comisiei**: creare, modificare și ștergere (doar în configurare), importul eligibililor (în configurare sau cu votul deschis), deschiderea (cu toate cheile, lista nevidă și data închiderii încă în viitor), închiderea (calculează și publică agregatul) și `closeExpired` (scrutinele deschise cu data închiderii trecută; o eroare neașteptată apare în log, iar celelalte scrutine se închid în continuare). |
+| `src/elections/elections.service.ts` | **Acțiunile comisiei**: creare, modificare și ștergere (doar în configurare), importul și **scoaterea** eligibililor (în configurare sau cu votul deschis; la scoatere, înregistrarea celor care n-au votat se șterge și ea, cine a votat rămâne), deschiderea (cu toate cheile, lista nevidă și data închiderii încă în viitor), închiderea (calculează și publică agregatul) și `closeExpired` (scrutinele deschise cu data închiderii trecută; o eroare neașteptată apare în log, iar celelalte scrutine se închid în continuare). |
 | `src/elections/election.rows.ts` | Rândurile din PostgreSQL transformate în obiectele contractului; interogarea comună cu statisticile; lista candidaților de inserat (votul alb ultimul); `slug` (ID-ul scrutinului din titlu, fără diacritice). |
 | `src/elections/auto-close.service.ts` | **Închiderea automată**: la fiecare minut (`AUTO_CLOSE_INTERVAL_MS`), cheamă `closeExpired`. În jurnal, actorul e `server`, cu `automatic: true`. |
 | `src/trustees/trustees.service.ts` | Trustees: autentificarea cu token-ul (căutat după SHA-256) și primirea cheii Yᵢ cu dovada Schnorr; când au trimis toți, publică cheia scrutinului. |
@@ -670,7 +670,7 @@ NestJS + PostgreSQL. Un folder per modul (o „responsabilitate”). Fiecare mod
 | `test/helpers.ts` | Baza de test (o **golește** la fiecare suită!), pornirea serverului pe un port liber, clienți cu și fără token, datele unui scrutin de test. |
 | `test/election-flow.e2e.test.ts` | 16 teste: tot fluxul, de la creare la verificarea publică, cu toate încercările de fraudă. |
 | `test/interval.e2e.test.ts` | 5 teste: vot înainte de deschidere, scrutin cu închiderea în trecut, voturi simultane cu ore crescătoare, ceasuri diferite, închiderea automată. |
-| `test/commission.e2e.test.ts` | 3 teste: membrii și rolurile, modificarea și ștergerea, votul alb. |
+| `test/commission.e2e.test.ts` | 4 teste: membrii și rolurile, modificarea și ștergerea, votul alb, scoaterea din lista de eligibili. |
 | `test/rate-limit.e2e.test.ts` | 3 teste: ghicirea token-ului oprită cu 429, rutele publice neafectate, `/health`. |
 | `test/cli.e2e.test.ts` | 1 test lung: CLI-urile reale, ca procese separate (keygen cu cheie criptată și necriptată, decrypt, verificare online și offline, pe un fir și pe două, un fișier Benaloh incomplet → codul 2). |
 | `test/pg-options.test.ts` | 3 teste, fără bază de date: când se cere SSL (local, la distanță, `sslmode`, `DATABASE_SSL`) și când se verifică certificatul (`DATABASE_CA`). |
@@ -705,6 +705,7 @@ Panoul comisiei și pagina publică a fiecărui scrutin. React + Vite + React Ro
 | `src/api/admin.ts` | Token-ul comisiei în `sessionStorage` (dispare la închiderea tab-ului), identitatea autentificată într-un context React (`useAdmin`), `canEdit` (doar rolul `comisie` vede butoanele care schimbă ceva). |
 | `src/lib/format.ts` | Re-exportă formatările comune din `@evoting/api`. |
 | `src/lib/useAsync.ts` | Hook-ul care încarcă date la deschiderea unei pagini și le reîncarcă la cerere (stările „se încarcă”, „eroare”, „date”). |
+| `src/lib/trusteeTokens.ts` | Token-urile trustees păstrate în `sessionStorage` (doar în acest tab) până când comisia confirmă că le-a transmis; comanda `keygen` a fiecărui trustee și fișierul `.txt` cu toate comenzile. |
 | `src/lib/verify-workers.ts` | Verificarea în paralel în browser: `createBrowserWork` pornește câte un **Web Worker** pe nucleu (cel mult 16), legat de bazinul din `@evoting/crypto`. |
 | `src/lib/verify.worker.ts` | Codul unui Web Worker: primește o bucată din board și o verifică (aceeași funcție ca firele din Node). |
 | `src/components/layout/Layout.tsx` | Bara de sus (sigla, meniul, modul: backend simulat sau adresa API-ului) și locul paginii. |
@@ -718,7 +719,7 @@ Panoul comisiei și pagina publică a fiecărui scrutin. React + Vite + React Ro
 | `src/pages/commission/ElectionForm.tsx` | Formularul comun: titlu, interval (implicit de mâine la 8:00, trei zile), candidați (adăugare, ștergere, mutare sus/jos), „permite votul alb”, trustees (doar la creare). |
 | `src/pages/commission/CommissionElection.tsx` | Pagina unui scrutin pentru comisie: starea, ceasul, acțiunile (modifică, șterge cu confirmare, deschide, închide tot cu confirmare), etapele, statisticile, trustees, opțiunile, importul, hash-ul de publicat, jurnalul, uneltele de test. Observatorul vede tot, fără butoane. |
 | `src/pages/commission/CommissionMembers.tsx` | Membrii comisiei: creare (token-ul afișat o singură dată), listă, revocare. |
-| `src/pages/commission/parts/` | Bucățile paginii de mai sus: `Steps` (configurare → vot → numărare → rezultat), `TrusteeTokens` (comenzile trustees, o singură dată), `EligibleImport` (CSV lipit sau din fișier, și cu votul deschis), `BoardHead` (`poziție:hash` de publicat independent), `AuditLog` (jurnalul, cu acțiunile traduse și înregistrările alegătorilor doar numărate), `MockToolsPanel` (butoanele „Simulează…”). |
+| `src/pages/commission/parts/` | Bucățile paginii de mai sus: `Steps` (configurare → vot → numărare → rezultat), `TrusteeTokens` (comenzile trustees, păstrate în tab până la „Am transmis token-urile”, descărcabile ca `.txt`), `EligibleImport` (CSV lipit sau din fișier, și cu votul deschis; modul „Adaugă” sau „Scoate”, scoaterea cu confirmare), `BoardHead` (`poziție:hash` de publicat independent), `AuditLog` (jurnalul, cu acțiunile traduse, scoaterile din listă rezumate ca numere și înregistrările alegătorilor doar numărate), `MockToolsPanel` (butoanele „Simulează…”). |
 | `src/pages/election/ElectionPublic.tsx` | Pagina publică a unui scrutin: starea, ceasul, statisticile și cele cinci tab-uri. |
 | `src/pages/election/tabs/BoardTab.tsx` | Board-ul, câte 50 de intrări pe pagină (cele mai noi primele), și căutarea după codul de urmărire, verificată în browser față de codul căutat (nu față de ce scrie ulterior în câmp). |
 | `src/pages/election/tabs/ResultTab.tsx` | Rezultatul, cu bare proporționale; votul alb apare separat, la final. |
@@ -879,6 +880,7 @@ O **cerere HTTP** e un mesaj trimis de un program (site, telefon, CLI) serverulu
   1. pentru fiecare linie: `isValidCnp`; cele invalide apar în răspuns doar ca număr de linie și o **mască** (`50…12`), ca un CNP greșit să nu ajungă în jurnale;
   2. `cnpHmac(CNP_HMAC_KEY, cnp)`; CNP-ul în clar nu se scrie nicăieri;
   3. într-o tranzacție, permisă în `draft` **sau** `open`: `INSERT … ON CONFLICT DO NOTHING` în `eligible_voters`, câte 1.000 deodată; în jurnal intră doar numerele (importați, duplicate, invalide).
+  4. dacă cineva a fost adăugat din greșeală, modul „Scoate” trimite CSV-ul la `POST /elections/:id/eligible/remove`: cine n-a votat e scos (cu tot cu înregistrare, dacă are), cine a votat rămâne (9.18).
 - **Deschiderea:** `POST /elections/:id/open` → `ElectionsService.open`: doar din `draft`, cu toate cheile trimise, lista nevidă și **data închiderii încă în viitor**. Starea devine `open`.
 
 ## Pasul 5. Ana se înregistrează
@@ -1032,6 +1034,7 @@ Serverul are **29 de rute**. Toate cer și întorc JSON, cu o excepție: importu
 | PATCH | `/elections/:id` | comisie | Modifică titlul, intervalul, candidații, votul alb (doar în `draft`). |
 | DELETE | `/elections/:id` | comisie | Șterge scrutinul (doar în `draft`). |
 | POST | `/elections/:id/eligible` | comisie | Importă CNP-uri dintr-un CSV (în `draft` sau `open`). |
+| POST | `/elections/:id/eligible/remove` | comisie | Scoate CNP-uri din listă (CSV, în `draft` sau `open`). Înregistrarea celor care n-au votat se șterge și ea; cine a votat rămâne. Răspunde cu numerele: scoși, înregistrări șterse, absenți din listă, păstrați pentru că au votat, invalide. |
 | POST | `/elections/:id/open` | comisie | Deschide votul. |
 | POST | `/elections/:id/close` | comisie | Închide votul și publică agregatul. |
 | GET | `/elections/:id/audit-log` | orice rol | Jurnalul de audit al scrutinului. |
@@ -1281,9 +1284,47 @@ Tot proiectul a fost reverificat: citirea codului, testele pe PostgreSQL, apoi f
 
 Pentru completitudine: un CSV de eligibili salvat din Excel (cu BOM UTF-8 la început) e citit corect, pentru că serverul (body-parser) și browserul (`File.text()`) elimină BOM-ul. Titlul „Magazin Gestiune” văzut în browser pe `localhost:5174` venea de la un *service worker* al altui proiect rămas în Chrome pe aceeași adresă, nu de la acest proiect (al cărui titlu e „Vot verificabil”). Un service worker e un mic program pe care un site îl lasă în browser ca să meargă și offline; el răspunde în locul serverului la orice cerere către aceeași adresă (`localhost:5174`), deci și pentru alt proiect pornit ulterior pe acel port. A fost șters pe 18 nov. (service worker-ul dezînregistrat și cache-ul lui, `magazin-app-cache-v1`, golit); după reîncărcare, titlul e „Vot verificabil”. Cum se face de mână: tabelul din 10.10.
 
-## 9.18 Ce a rămas din analiză
+## 9.18 Scoaterea din lista de eligibili (punctul 2 din analiză)
 
-Din cele 30 de puncte ale analizei, 12 sunt rezolvate, 6 parțial, iar 12 rămân (lista completă, cu starea fiecăruia, în `docs/ANALIZA.md`, secțiunea 5). Cele mai importante rămase: schema t-din-n pentru trustees, autoritatea de înregistrare separată (împotriva ballot stuffing), certificatul CSCA al României și testele automate pentru interfețe.
+Până acum, un CNP importat greșit nu mai putea fi scos. Acum, în cardul „Lista alegătorilor eligibili”, comisia alege **„Scoate”**, lipește CNP-urile (sau încarcă un CSV) și confirmă a doua oară. Ruta e `POST /elections/:id/eligible/remove`, doar pentru rolul `comisie`, în configurare sau cu votul deschis.
+
+- Persoana scoasă **nu se mai poate înregistra**.
+- Dacă s-a înregistrat, dar **n-a votat**, înregistrarea și provocările ei se șterg: credentialul de pe telefonul ei nu mai poate vota. Lista publică de credentiale se micșorează corespunzător, deci verificatorul trece în continuare.
+- Dacă **a votat deja**, rămâne în listă: votul de pe board nu se poate scoate (board-ul e append-only, iar baza de date ar refuza oricum ștergerea înregistrării unui credential care a votat).
+- În jurnal intră doar numerele (scoși, înregistrări șterse, absenți, păstrați, invalide), niciun CNP sau HMAC; la fel ca la import, CNP-urile invalide apar în răspuns doar mascat.
+- Totul se face într-o singură tranzacție, cu rândul scrutinului blocat, deci nu se poate amesteca cu un vot trimis în aceeași clipă.
+
+Codul: `ElectionsService.removeEligible` (backend), `removeCsv` (backend-ul simulat), `parseCnpList` (CSV-ul, comun), `EligibleImport.tsx` (site). Teste: unul e2e pe PostgreSQL (inclusiv verificatorul public la final), unul pe backend-ul simulat, unul pentru parserul CSV.
+
+## 9.19 Token-urile trustees nu se mai pierd
+
+Serverul păstrează doar hash-ul token-urilor trustees, deci le arată o singură dată, la crearea scrutinului. Până acum erau doar în starea navigării: un clic pe „Modifică” sau o reîncărcare a paginii înainte de copiere le pierdea definitiv, iar scrutinul nu mai putea primi chei (trebuia șters și refăcut). Acum:
+
+- rămân în `sessionStorage` (doar în tab-ul curent, ca token-ul comisiei) până când comisia apasă **„Am transmis token-urile, ascunde-le”**;
+- se pot descărca toate într-un fișier `.txt`, cu comanda fiecărui trustee;
+- comanda afișată include `--encrypt`, deci trustee-ul își protejează fișierul de cheie cu o parolă (9.10).
+
+Testat în Chrome: panoul rămâne după „Modifică → Renunță” și după reîncărcare, iar după „Am transmis” nu mai apare nici la reîncărcare.
+
+## 9.20 Teste automate pentru site: ce lipsește
+
+Testele automate pentru interfață (punctul 25) au nevoie de unelte noi (Vitest, jsdom, Testing Library). Instalarea lor a fost oprită de sistemul de permisiuni al asistentului, deci n-au fost adăugate. Până atunci, interfața a fost testată cap-coadă în Chrome, iar logica ei e acoperită indirect: `auditBallot` (Benaloh), `parseCnpList`, `plural`, backend-ul simulat pe care rulează site-ul fără server. Pentru a le adăuga: `npm install -D -w @evoting/web vitest jsdom @testing-library/react @testing-library/dom @testing-library/user-event`.
+
+## 9.21 Ce a rămas din analiză
+
+Din cele 30 de puncte ale analizei, 13 sunt rezolvate, 5 parțial, iar 12 rămân (lista completă, cu starea fiecăruia, în `docs/ANALIZA.md`, secțiunea 5). Cele mai importante rămase: schema t-din-n pentru trustees, autoritatea de înregistrare separată (împotriva ballot stuffing), certificatul CSCA al României și testele automate pentru interfețe.
+
+## 9.22 Jurnalul celei de-a doua verificări (18 nov., seara), pe scurt
+
+În ordinea în care s-au făcut:
+
+1. **Verificarea:** PR-ul #5 era deja în `master`. Codul a fost recitit integral (backend, criptografie, API, CLI-uri, site); lint, formatare, tipuri, build și cele 93 de teste pe PostgreSQL. Aici a ieșit problema CRLF de pe Windows (9.16, punctul 5).
+2. **Folosirea reală, în Chrome:** serverul pornit pe o bază separată (`evoting_dev`, în containerul de test), populată cu simulatorul (60 de alegători), apoi site-ul folosit pas cu pas. Au ieșit alarma falsă de pe board, acuzația falsă de la Benaloh, închiderea fără confirmare și textele în română (9.16).
+3. **Reparațiile și verificarea în paralel** (9.15, 9.16), cu teste noi; în timpul testelor CLI a ieșit și prăbușirea de pe Windows (9.16, punctul 4).
+4. **Măsurătorile:** o simulare cu 1.000 de alegători și verificarea aceluiași pachet pe 1, 2, 4, 8 și 16 fire, de trei ori (Partea 12); verificarea și în Chrome.
+5. **Livrarea:** două commit-uri (codul, documentația) pe ramura `claude/verificare-paralela-si-reparatii`, **PR #6**. GitHub Actions a trecut: testele pe Linux (inclusiv `worker_threads`) și bundle-ul Android.
+6. **Încă o rundă, pe aceeași ramură:** scoaterea din lista de eligibili (9.18) și token-urile trustees care nu se mai pierd (9.19), testate automat și în Chrome; testele automate de interfață au rămas neinstalate (9.20).
+7. **Curățenia în Chrome:** service worker-ul altui proiect de pe `localhost:5174` („Magazin Gestiune”) a fost dezînregistrat și cache-ul lui golit (9.17); serverele de dezvoltare pornite pentru teste au fost oprite.
 
 ---
 
@@ -1332,7 +1373,7 @@ TEST_DATABASE_URL=postgres://evoting:evoting@localhost:5433/evoting_test npm tes
 $env:TEST_DATABASE_URL = "postgres://evoting:evoting@localhost:5433/evoting_test"; npm test
 ```
 
-Rezultatul așteptat: **54 + 23 + 31 = 108 teste, toate trecute**. Atenție: testele **golesc** baza de test la fiecare rulare, deci nu folosi o bază cu date de păstrat.
+Rezultatul așteptat: **54 + 25 + 32 = 111 teste, toate trecute**. Atenție: testele **golesc** baza de test la fiecare rulare, deci nu folosi o bază cu date de păstrat.
 
 ## 10.3 Demonstrație fără server (backend-ul simulat)
 
@@ -1489,13 +1530,13 @@ DATABASE_URL=... node demos/attacks/dist/tamper-board.js --election <ID> --seq 3
 
 # Partea 11. Testele: ce verifică fiecare
 
-Un **test automat** e un mic program care folosește codul proiectului și verifică un rezultat așteptat („buletinul cu două voturi trebuie respins”). Dacă o modificare strică ceva, testul pică. Proiectul are **108 teste**, rulate cu `npm test` și, la fiecare `git push`, de GitHub Actions.
+Un **test automat** e un mic program care folosește codul proiectului și verifică un rezultat așteptat („buletinul cu două voturi trebuie respins”). Dacă o modificare strică ceva, testul pică. Proiectul are **111 teste**, rulate cu `npm test` și, la fiecare `git push`, de GitHub Actions.
 
 | Suită | Teste | Rulează pe |
 | --- | --- | --- |
 | `packages/crypto` | 54 | doar matematica, fără server (inclusiv verificarea pe `worker_threads` reale) |
-| `packages/api` | 23 | parserele de identitate, formatările în română și backend-ul simulat |
-| `apps/backend` | 31 | serverul real, pornit pe un PostgreSQL real; testele CLI rulează programele ca procese separate; 3 teste fără bază (opțiunile SSL) |
+| `packages/api` | 25 | parserele de identitate (și lista CSV de CNP-uri), formatările în română și backend-ul simulat |
+| `apps/backend` | 32 | serverul real, pornit pe un PostgreSQL real; testele CLI rulează programele ca procese separate; 3 teste fără bază (opțiunile SSL) |
 
 Testele serverului se numesc **end-to-end** (e2e): pornesc serverul adevărat, îi trimit cereri HTTP adevărate și verifică inclusiv ce a ajuns în baza de date.
 
@@ -1513,19 +1554,19 @@ Testele serverului se numesc **end-to-end** (e2e): pornesc serverul adevărat, �
 
 **`parallel.test.ts` (9):** pe `worker_threads` reale, raportul e identic cu cel de pe un singur fir; cu un buletin trișat și o semnătură furată, eșecurile sunt aceleași, în aceeași ordine; rezultatele revin în ordinea board-ului chiar dacă bucățile se termină în altă ordine, iar progresul ajunge la total; agregatul adunat pe bucăți e identic, iar un buletin trunchiat dă aceeași eroare ca pe un fir; un fir căzut oprește verificarea cu eroare; o intrare `null` pe board e raportată, fără ca verificarea să se oprească; auditul Benaloh deosebește datele incomplete de o nepotrivire reală (2 teste); cheile Ed25519 de ordin mic sunt respinse.
 
-## 11.2 `packages/api` (23)
+## 11.2 `packages/api` (25)
 
-**`cnp.test.ts` (3):** cifra de control și data; formatul, prima cifră și județul greșite; generatorul produce doar CNP-uri valide.
+**`cnp.test.ts` (4):** cifra de control și data; formatul, prima cifră și județul greșite; generatorul produce doar CNP-uri valide; lista CSV (antet, coloane separate prin `;` sau `,`, ghilimele, CRLF, liniile invalide cu numărul lor).
 
 **`mrz.test.ts` (7):** cifra de control ICAO pe exemplele din documentul 9303; exemplul oficial TD1; exemplul oficial TD2; buletinul vechi (CNP-ul reconstituit); CEI (CNP-ul din câmpul opțional); text OCR cu zgomot și confuzii O/0 citit corect, iar o cifră greșită prinsă; text fără MRZ.
 
 **`dg1.test.ts` (3):** MRZ-ul TD1 și TD2 împachetat și despachetat; DG1 fără eticheta 61 sau fără MRZ respins; base64 reversibil.
 
-**`mock.test.ts` (7):** un scrutin complet pe backend-ul simulat, verificat de verificatorul public; scrutinele de demonstrație trec verificatorul; re-înregistrarea înlocuiește credentialul dacă persoana n-a votat, fără să coboare nivelul de încredere; votul alb e criptat ca oricare altă opțiune și apare în rezultat; modificarea și ștergerea doar în configurare; votul refuzat în afara intervalului și închiderea automată; uneltele de test, CNP-ul propriu adăugat în listă și membrii comisiei.
+**`mock.test.ts` (8):** un scrutin complet pe backend-ul simulat, verificat de verificatorul public; scrutinele de demonstrație trec verificatorul; re-înregistrarea înlocuiește credentialul dacă persoana n-a votat, fără să coboare nivelul de încredere; votul alb e criptat ca oricare altă opțiune și apare în rezultat; modificarea și ștergerea doar în configurare; votul refuzat în afara intervalului și închiderea automată; uneltele de test, CNP-ul propriu adăugat în listă și membrii comisiei; scoaterea din lista de eligibili, cu aceleași reguli ca serverul real.
 
 **`format.test.ts` (3):** acordul numeralelor („1 cheie”, „2 chei”, „20 de chei”, „105 voturi”, „120 de voturi”); duratele („45 de minute”, „21 de ore”, „2 zile și 3 ore”); faza intervalului, cu marginile incluse.
 
-## 11.3 `apps/backend` (31, dintre care 28 pe PostgreSQL)
+## 11.3 `apps/backend` (32, dintre care 29 pe PostgreSQL)
 
 **`election-flow.e2e.test.ts` (16), un scrutin cap-coadă:**
 
@@ -1548,7 +1589,7 @@ Testele serverului se numesc **end-to-end** (e2e): pornesc serverul adevărat, �
 
 **`interval.e2e.test.ts` (5):** votul nu se poate trimite înainte de deschidere; un scrutin cu data închiderii trecută nu se poate deschide; 16 voturi trimise deodată primesc ore crescătoare, în ordinea de pe board, și trec de verificator; ora unei intrări noi nu e niciodată mai veche decât a celei anterioare (ceasuri diferite pe instanțe); după `closesAt` votul e refuzat, iar serverul închide singur scrutinul.
 
-**`commission.e2e.test.ts` (3):** membrii comisiei (token propriu, observatorul doar citește, revocarea, actorul din jurnal); modificarea și ștergerea doar în configurare; votul alb, numărat separat.
+**`commission.e2e.test.ts` (4):** membrii comisiei (token propriu, observatorul doar citește, revocarea, actorul din jurnal); modificarea și ștergerea doar în configurare; votul alb, numărat separat; scoaterea din lista de eligibili (observatorul refuzat, înregistrarea nevotată ștearsă, votul păstrat, persoana scoasă nu mai votează și nu se mai înregistrează, re-adăugarea, jurnalul fără CNP-uri, refuz după închidere, verificatorul public trece).
 
 **`rate-limit.e2e.test.ts` (3):** ghicirea token-ului comisiei e oprită după câteva încercări (429); rutele publice nu sunt afectate; `/health` răspunde fără token.
 
@@ -1707,7 +1748,7 @@ Serverul refuză orice vot după `closesAt`, închide singur scrutinul (verific�
 Criptarea unui buletin durează ~20 ms; serverul validează ~40 de buletine pe secundă pe un singur proces; verificarea publică ia ~24 ms per buletin pe un fir (4 minute la 10.000), dar se împarte pe toate nucleele: ~6 s în loc de ~30 s la 1.000 de buletine, pe un PC cu 8 nuclee. Pentru o facultate (10.000 de voturi într-o zi, sub 0,2 pe secundă în medie) e suficient (Partea 12).
 
 **22. Cum ați testat?**
-108 teste automate, dintre care 28 pornesc serverul real pe PostgreSQL (și 9 verifică verificarea în paralel pe fire reale); cinci demonstrații de atac; simulări cu 100, 1.000 și 10.000 de alegători, în care rezultatul publicat a fost egal cu voturile simulate și verificatorul a trecut; GitHub Actions rulează totul la fiecare modificare; tot sistemul pornit în Docker, prin HTTPS.
+111 teste automate, dintre care 29 pornesc serverul real pe PostgreSQL (și 9 verifică verificarea în paralel pe fire reale); cinci demonstrații de atac; simulări cu 100, 1.000 și 10.000 de alegători, în care rezultatul publicat a fost egal cu voturile simulate și verificatorul a trecut; GitHub Actions rulează totul la fiecare modificare; tot sistemul pornit în Docker, prin HTTPS.
 
 **23. De ce TypeScript peste tot?**
 Ca o dovadă generată pe telefon să fie verificată de exact același cod pe server și la audit. Două implementări ale aceleiași matematici, în limbaje diferite, ar putea diferi într-un detaliu.
@@ -1726,6 +1767,9 @@ Un răspuns onest: aș pune de la început t-din-n și o autoritate de înregist
 
 **28. Cum ați accelerat verificarea publică și de ce nu e de 16 ori mai rapidă pe 16 nuclee?**
 Buletinele sunt independente, deci semnăturile, dovezile și agregatul lor se verifică pe bucăți, pe mai multe fire (`worker_threads` în Node, Web Workers în browser); doar lanțul de hash-uri, care leagă fiecare intrare de cea dinainte, rămâne pe firul principal. Rezultatele se pun la loc în ordinea board-ului, deci raportul e identic, lucru verificat în teste. Accelerarea e de ~5 ori, nu 16: cele 16 nuclee „logice” sunt 8 fizice cu hyperthreading, pornirea firelor costă ~0,25 s, iar partea secvențială (lanțul, combinarea) rămâne (legea lui Amdahl).
+
+**29. Poate comisia să scoată pe cineva din listă după ce a votat? Sau să „șteargă” un vot?**
+Nu. Scoaterea din listă (9.18) refuză persoanele care au votat deja: votul lor e pe board, iar board-ul e append-only (un trigger în baza de date refuză orice modificare sau ștergere) și legat prin hash-uri. Cine n-a votat poate fi scos, iar credentialul lui dispare din lista publică; acțiunea apare în jurnalul de audit, cu numele membrului comisiei, dar fără CNP-uri.
 
 ---
 

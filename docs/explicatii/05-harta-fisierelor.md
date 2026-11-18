@@ -112,7 +112,7 @@ E-VOTING-Platform
 | `src/voter.ts` | Pașii alegătorului: autentificare, criptare, trimitere, verificare. |
 | `src/format.ts` | Etichetele și formatările comune site-ului și aplicației (stări, date, durate, „Vot alb”, cât mai e din interval). |
 | `src/index.ts` | Exportă tot. |
-| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts`, `format.test.ts` | 23 de teste: CNP, MRZ, DG1, formatările în română și scrutine complete pe serverul simulat (inclusiv re-înregistrare, vot alb, interval, membri). |
+| `test/cnp.test.ts`, `mrz.test.ts`, `dg1.test.ts`, `mock.test.ts`, `format.test.ts` | 25 de teste: CNP (și lista CSV), MRZ, DG1, formatările în română și scrutine complete pe serverul simulat (inclusiv re-înregistrare, vot alb, interval, membri, scoaterea din lista de eligibili). |
 | `README.md` | Harta pachetului. |
 
 ## `apps/backend/`: serverul
@@ -209,6 +209,7 @@ E-VOTING-Platform
 | `src/lib/format.ts` | Formatările (re-exportate din `@evoting/api`). |
 | `src/lib/useAsync.ts` | Încărcarea datelor în pagini. |
 | `src/lib/verify-workers.ts`, `src/lib/verify.worker.ts` | Verificarea publică în paralel, în browser (Web Workers). |
+| `src/lib/trusteeTokens.ts` | Token-urile trustees păstrate în tab până la confirmare și descărcarea lor ca `.txt`. |
 | `README.md` | Harta site-ului și comenzile. |
 
 ## `apps/mobile/`: aplicația de telefon

@@ -77,9 +77,9 @@ assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
 | Suită | Câte teste | Ce verifică |
 | --- | --- | --- |
 | `packages/crypto` | 54 | JSON canonic, HMAC (cu vectorul oficial RFC 4231), ElGamal, adunarea criptotextelor, baby-step giant-step, buletine valide, toate tipurile de buletine invalide (vot 2, vot −1, două voturi, niciun vot, dovezi copiate din alt scrutin, buletin copiat de alt alegător), Benaloh (inclusiv datele incomplete), trustees care trișează, verificatorul pe 13 tipuri de manipulare (inclusiv ore greșite), verificarea în paralel pe fire reale (raport identic), intrările malformate, cheile Ed25519 de ordin mic. |
-| `packages/api` | 23 | Acordul numeralelor și duratele în română, CNP, MRZ (exemplele oficiale ICAO, buletinul vechi, CEI, zgomot de OCR), DG1 și, pe serverul simulat, un scrutin complet, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii comisiei. |
-| `apps/backend` | 31 | Opțiunile SSL ale conexiunii (3 teste, fără bază). Pe un PostgreSQL real: tot fluxul, token-uri greșite, import și după deschidere, re-înregistrare, NFC (cip valid, DG1 modificat, CSCA străin, semnătură alterată), autentificare, buletine invalide, două voturi simultane, board-ul append-only și paginat, trustee care trișează, verificatorul, căutarea CNP-urilor în toată baza (nu trebuie să existe niciunul), un administrator care modifică board-ul direct în bază, jurnalul de audit; intervalul (vot înainte de deschidere, 16 voturi simultane cu ore crescătoare, închiderea automată); membrii comisiei și rolurile, modificare/ștergere, votul alb; limitarea de rată; CLI-urile reale, ca procese separate (și verificarea pe două fire). |
-| **Total** | **108** | |
+| `packages/api` | 25 | Acordul numeralelor și duratele în română, CNP (și lista CSV), MRZ (exemplele oficiale ICAO, buletinul vechi, CEI, zgomot de OCR), DG1 și, pe serverul simulat, un scrutin complet, re-înregistrarea, votul alb, modificarea și ștergerea, intervalul, uneltele de test și membrii comisiei. |
+| `apps/backend` | 32 | Opțiunile SSL ale conexiunii (3 teste, fără bază). Pe un PostgreSQL real: tot fluxul, token-uri greșite, import și după deschidere, re-înregistrare, NFC (cip valid, DG1 modificat, CSCA străin, semnătură alterată), autentificare, buletine invalide, două voturi simultane, board-ul append-only și paginat, trustee care trișează, verificatorul, căutarea CNP-urilor în toată baza (nu trebuie să existe niciunul), un administrator care modifică board-ul direct în bază, jurnalul de audit; intervalul (vot înainte de deschidere, 16 voturi simultane cu ore crescătoare, închiderea automată); membrii comisiei și rolurile, modificare/ștergere, votul alb, scoaterea din lista de eligibili; limitarea de rată; CLI-urile reale, ca procese separate (și verificarea pe două fire). |
+| **Total** | **111** | |
 
 ### Cum rulezi testele pe PC
 
@@ -101,7 +101,7 @@ Fără `TEST_DATABASE_URL`, testele de server apar ca „sărite” (`SKIP`), nu
 
 ### Pe GitHub
 
-La fiecare `git push`, `ci.yml` rulează linterul, verificarea formatării și aceleași 108 teste pe serverele GitHub, cu un PostgreSQL pornit ca serviciu. Pe pagina proiectului, la **Actions**, vezi ✓ sau ✗ pentru fiecare push.
+La fiecare `git push`, `ci.yml` rulează linterul, verificarea formatării și aceleași 111 teste pe serverele GitHub, cu un PostgreSQL pornit ca serviciu. Pe pagina proiectului, la **Actions**, vezi ✓ sau ✗ pentru fiecare push.
 
 ### Testul reparat recent
 
